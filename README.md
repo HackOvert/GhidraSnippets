@@ -128,6 +128,84 @@ hf = res.getHighFunction()
 print(hf)
 ```
 
+# Emulating PCode
+```python
+#Simple PCode emulator
+#@author 
+#@category Examples.Emulation
+#@keybinding
+#@menupath
+#@toolbar
+
+from ghidra.app.emulator import EmulatorHelper
+from ghidra.program.model.symbol import SymbolUtilities
+
+# == Helper functions ======================================================
+def getAddress(offset):
+    return currentProgram.getAddressFactory().getDefaultAddressSpace().getAddress(offset)
+
+def getSymbolAddress(symbolName):
+    symbol = SymbolUtilities.getLabelOrFunctionSymbol(currentProgram, symbolName, None)
+    if (symbol != None):
+        return symbol.getAddress()
+    else:
+        raise("Failed to locate label: {}".format(symbolName))
+
+def getProgramRegisterList(currentProgram):
+    pc = currentProgram.getProgramContext()
+    return pc.registers
+
+# == Main function =========================================================
+def main():
+    CONTROLLED_RETURN_OFFSET = 0
+
+    # Identify function to be emulated
+    mainFunctionEntry = getSymbolAddress("main")
+
+    # Obtain entry instruction in order to establish initial processor context
+    entryInstr = getInstructionAt(mainFunctionEntry)
+
+    # Establish emulation helper
+    emuHelper = EmulatorHelper(currentProgram)
+
+    # Set controlled return location so we can identify return from emulated function
+    controlledReturnAddr = getAddress(CONTROLLED_RETURN_OFFSET)
+
+    # Set initial RIP
+    mainFunctionEntryLong = int("0x{}".format(mainFunctionEntry), 16)
+    emuHelper.writeRegister(emuHelper.getPCRegister(), mainFunctionEntryLong)
+
+    registers = getProgramRegisterList(currentProgram)
+
+    print("Emulation starting at 0x{}".format(mainFunctionEntry))
+    while monitor.isCancelled() is False:
+        
+        executionAddress = emuHelper.getExecutionAddress()  
+        if (executionAddress == controlledReturnAddr):
+            print("Emulation complete.")
+            return
+
+        print("Address: 0x{}".format(executionAddress))
+        for reg in registers:
+            if str(reg).startswith('R') and len(str(reg)) == 3 and str(reg) != 'RIP':
+                reg_value = emuHelper.readRegister(reg)
+                if reg_value != 0:
+                    print("  {} = {:#018x}".format(reg, reg_value))
+
+        success = emuHelper.step(monitor)
+        if (success == False):
+            lastError = emuHelper.getLastError()
+            printerr("Emulation Error: '{}'".format(lastError))
+            return
+
+    # Cleanup resources and release hold on currentProgram
+    emuHelper.dispose()
+
+# == Invoke main ===========================================================
+main()
+```
+
+
 [0]: https://ghidra-sre.org/
 [1]: https://ghidra.re/ghidra_docs/api/ghidra/program/flatapi/FlatProgramAPI.html
 [2]: https://ghidra.re/ghidra_docs/api/ghidra/app/decompiler/flatapi/FlatDecompilerAPI.html
