@@ -6,7 +6,11 @@
 * Loooking for the latest API Docs? In Ghidra's UI, select **Help** -> **Ghidra API Help** to unpack the docs and view them.
 * Just want a quick online API reference? [Ghidra.re](https://ghidra.re/) hosts an online version of the [API docs](https://ghidra.re/ghidra_docs/api/index.html) (may not be up to date).
 
-## Table of Contents
+# Contributing
+
+Feel free to submit pull requests to master on this repo with any modifications you see fit. Most of these snippets are meant to be verbose, but if you know of a better way to do something, please share it via pull request or submitting an issue. Thanks!
+
+# Table of Contents
 
 <details>
 <summary>Working with Projects</summary>
@@ -60,7 +64,7 @@
 
 </details>
 
-# Working with Projects
+## Working with Projects
 A Ghidra *Project* (class [GhidraProject][4]) contains a logical set of program binaries related to a reverse engineering effort. Projects can be shared (collaborative) or non-shared (private). The snippets in this section deal with bulk import and analysis, locating project files on disk, and more.
 
 ### Get the name and location on disk of the current project
@@ -151,7 +155,7 @@ The project 'pcodeproject' has 4 files in it:
 <br>[⬆ Back to top](#table-of-contents)
 
 
-# Working with Programs
+## Working with Programs
 A *Program* is a binary component within a Ghidra Project. The snippets in this section deal with gathering information about the Programs within a Project.
 
 ### List the current program's name and location on disk
@@ -176,7 +180,7 @@ Its location on disk is: '/C:/Users/username/Desktop/pcode/emulation/deobExample
 <br>[⬆ Back to top](#table-of-contents)
 
 
-# Working with Functions
+## Working with Functions
 A *Function* is a subroutine within an Program. The snippets in this section deal with gathering information about Functions and modifying them within an Program.
 
 ### Enumerate all functions printing their name and address
@@ -260,8 +264,7 @@ main is located at 0x00100690
 
 <br>[⬆ Back to top](#table-of-contents)
 
-# Working with Instructions
-A blurb here about this section and working with Instructions...
+## Working with Instructions
 
 ### Print all instructions in a select function
 ```python
@@ -322,7 +325,7 @@ for codeUnit in codeUnits:
 
 <br>[⬆ Back to top](#table-of-contents)
 
-# Working with Basic Blocks
+## Working with Basic Blocks
 Basic Blocks are collections of continuous non-branching instructions within Functions. They are joined by conditional and non-conditional branches, revealing valuable information about a program and function's code flow. This section deals with examples working with Basic Block models.
 
 ### Print details about basic blocks in a select function
@@ -373,8 +376,7 @@ Basic block details for function 'main':
 <br>[⬆ Back to top](#table-of-contents)
 
 
-# Working with the Decompiler
-A blurb here about this section and working with the decompiler and P-Code...
+## Working with the Decompiler
 
 ### Print decompiled code for a specific function
 ```python
@@ -422,7 +424,7 @@ undefined8 main(void)
 
 <br>[⬆ Back to top](#table-of-contents)
 
-# Emulating PCode
+## Emulating PCode
 
 ### Emulating a function
 ```python
