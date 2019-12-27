@@ -30,7 +30,7 @@ Feel free to submit pull requests to master on this repo with any modifications 
 <details>
 <summary>Working with Functions</summary>
 
-* [`Enumerate all functions printing their name and address`](#)
+* [`Enumerate all functions printing their name and address`](#enumerate-all-functions-printing-their-name-and-address)
 * [`Get a function's name by address`](#get-a-function's-name-by-address)
 * [`Get a function's address by name`](#get-a-function's-address-by-name)
 
