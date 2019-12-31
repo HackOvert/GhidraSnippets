@@ -40,6 +40,7 @@ Feel free to submit pull requests to master on this repo with any modifications 
 <summary>Working with Instructions</summary>
 
 * [`Print all instructions in a select function`](#print-all-instructions-in-a-select-function)
+* [`Find all calls and jumps to a register`](#find-all-calls-and-jumps-to-a-register)
 
 </details>
 
@@ -335,6 +336,37 @@ for codeUnit in codeUnits:
 
 <br>[⬆ Back to top](#table-of-contents)
 
+
+### Find all calls and jumps to a register
+This snippet shows how to find all instructions in an x86 program that are calls or jumps to a regitser. This information can be useful when attempting to track down a crash by researching code flow in hard-to-debug targets. `getRegister` returns `None` when the specified index is not a regitser. We use `startswith('J')` to account for all jump variants. This is not architecture agnostic and a little goofy but it gets the job done.
+
+```python
+listing = currentProgram.getListing()
+func = getFirstFunction()
+entryPoint = func.getEntryPoint()
+instructions = listing.getInstructions(entryPoint, True)
+
+for instruction in instructions:
+    addr = instruction.getAddress()
+    oper = instruction.getMnemonicString()
+    if (oper.startswith('CALL') or oper.startswith('J') and instruction.getRegister(0)):
+        print("0x{} : {}".format(addr, instruction))
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+0x001004c8 : CALL RAX
+0x00100544 : JMP RAX
+0x00100595 : JMP RDX
+0x00100771 : CALL R15
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+
 ## Working with Basic Blocks
 Basic Blocks are collections of continuous non-branching instructions within Functions. They are joined by conditional and non-conditional branches, revealing valuable information about a program and function's code flow. This section deals with examples working with Basic Block models.
 
@@ -360,7 +392,6 @@ while(blocks.hasNext()):
 	dest = bb.getDestinations(monitor)
 	while(dest.hasNext()):
 		dbb = dest.next()
-
         # For some odd reason `getCodeBlocksContaining()` and `.next()`
         # return the root basic block after CALL instructions (x86). To filter
         # these out, we use `getFunctionAt()` which returns `None` if the address
