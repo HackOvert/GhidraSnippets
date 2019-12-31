@@ -59,9 +59,10 @@ Feel free to submit pull requests to master on this repo with any modifications 
 </details>
 
 <details>
-<summary>Emulating PCode</summary>
+<summary>Working with PCode</summary>
 
 * [`Emulating a function`](#emulating-a-function)
+* [`Plotting a Function AST`](#plotting-a-function-ast)
 
 </details>
 
@@ -467,7 +468,7 @@ undefined8 main(void)
 
 <br>[⬆ Back to top](#table-of-contents)
 
-## Emulating PCode
+## Working with PCode
 
 ### Emulating a function
 Instruction emulation is an extremely powerful technique to asist in static code analysis.  Rarely however, do we have the full memory context in which dynamic code executes. So while emulation can bring an element of 'dynamic' analysis to static RE, it's typically plagued with problems of unknown memory state. For simple code this might be no problem. For object oriented code this can be a major difficulty.  Either way, some element of emulation can help tremendously in speeding up analysis.  Ghidra uses its internal intermediate representation (PCode) to define what instructions do. Emulation is the process of tracking these changes in a cumulative state. Unfortunely Ghidra doesn't provide fancy GUI controls around the emulator (yet), but it's fully scriptable. Ghidra v9.1 added emprovements to the `EmulatorHelper` class, which is really quite amazing. Here's a simple example of what you can do with it.
@@ -633,6 +634,140 @@ Address: 0x00100698 (MOV dword ptr [RBP + -0x24],EDI)
 
 <br>[⬆ Back to top](#table-of-contents)
 
+
+### Plotting a Function AST
+Ghidra does not define a default graph provider, so you cannot graph abstract synatax trees out of the box.  Here's a snippet that takes elements from Ghidra's Graph Java snippets and hacks them together to get an SVG version of a function's AST.  This requires you to have `GraphViz` installed with the `dot` binary in your `PATH`, and `networkx` and `pydot` accessible from the Ghidra Jython console.  Basically, I just copy my Python2 site-packages over to my ghidra_scripts directory and everything works.  Keep in mind that if your Python module uses a natively compiled element (like Matplot lib does), you won't be able to use it in Jython. If you know of a way, please let me know.
+
+```python
+import networkx as nx
+import pydot
+
+from ghidra.app.script import GhidraScript
+from ghidra.util.task import ConsoleTaskMonitor
+from ghidra.app.decompiler import DecompileOptions, DecompInterface
+from ghidra.program.model.pcode import PcodeOp
+
+def buildAST(func):
+    options = DecompileOptions()
+    monitor = ConsoleTaskMonitor()
+    ifc = DecompInterface()
+    ifc.setOptions(options)
+    ifc.openProgram(getCurrentProgram())
+    ifc.setSimplificationStyle("normalize")
+    res = ifc.decompileFunction(func, 60, monitor)
+    high = res.getHighFunction()
+    return high
+
+def buildGraph(graph, func, high):
+    vertices = {}
+    opiter = getPcodeOpIterator(high)
+    while opiter.hasNext():
+        op = opiter.next()
+        vert = createOpVertex(func, op)
+        graph.add_node(vert)
+        for i in range(0, op.getNumInputs()):
+            opcode = op.getOpcode()
+            if (i == 0 and (opcode == PcodeOp.LOAD or opcode == PcodeOp.STORE)):
+                continue
+            if (i == 1 and opcode == PcodeOp.INDIRECT):
+                continue
+            vn = op.getInput(i)
+            if (vn != None):
+                v = getVarnodeVertex(graph, vertices, vn)
+                graph.add_edge(v, vert)
+
+        outvn = op.getOutput()
+        if (outvn != None):
+            outv = getVarnodeVertex(graph, vertices, outvn)
+            if (outv != None):
+                graph.add_edge(vert, outv)
+
+def createOpVertex(func, op):
+    name = op.getMnemonic()
+    id = getOpKey(op)
+    opcode = op.getOpcode()
+    if ((opcode == PcodeOp.LOAD) or (opcode == PcodeOp.STORE)):
+        vn = op.getInput(0)
+        addrspace = currentProgram.getAddressFactory().getAddressSpace(vn.getOffset())
+        name += ' ' + addrspace.getName()
+    elif (opcode == PcodeOp.INDIRECT):
+        vn = op.getInput(1)
+        if (vn != None):
+            indOp = high.getOpRef(vn.getOffset())
+            if (indOp != None):
+                name += " (" + indOp.getMnemonic() + ")"
+    return "{}_{}".format(name, id)
+
+def createVarnodeVertex(graph, vn):
+    name = str(vn.getAddress())
+    id = getVarnodeKey(vn)
+    if (vn.isRegister()):
+        reg = currentProgram.getRegister(vn.getAddress(), vn.getSize())
+        if (reg != None):
+            name = reg.getName()
+    return "{}_{}".format(name, id)
+
+def getVarnodeVertex(graph, vertices, vn):
+    res = None
+    try:
+        res = vertices[str(vn.getUniqueId())]
+    except KeyError:
+        res = None
+    if (res == None):
+        res = createVarnodeVertex(graph, vn)
+        vertices[str(vn.getUniqueId())] = res
+    return res
+
+def getAddress(offset):
+    return currentProgram.getAddressFactory().getDefaultAddressSpace().getAddress(offset)
+
+def getOpKey(op):
+    sq = op.getSeqnum()
+    id = str(sq.getTarget()) + " o " + str(op.getSeqnum().getTime())
+    return id
+
+def getPcodeOpIterator(high):
+    return high.getPcodeOps()
+
+def getVarnodeKey(vn):
+    op = vn.getDef()
+    id = ""
+    if (op != None):
+        id = str(op.getSeqnum().getTarget()) + " v " + str(vn.getUniqueId())
+    else:
+        id = "i v " + str(vn.getUniqueId())
+    return id
+
+def main():
+    graph = nx.DiGraph()
+    listing = currentProgram.getListing()
+    func = getFunctionContaining(getAddress(0x00100690))
+    high = buildAST(func)
+    buildGraph(graph, func, high)
+
+    dot_data = nx.nx_pydot.to_pydot(graph)
+    svg = pydot.graph_from_dot_data(dot_data.to_string())[0].create_svg()
+    svg_path = "C:\\Users\\username\\Desktop\\test.svg"
+    f = open(svg_path, 'w')
+    f.write(svg)
+    f.close()
+
+    print("Wrote pydot SVG of graph to: {}\nNodes: {}, Edges: {}".format(svg_path, len(graph.nodes), len(graph.edges)))
+
+main()
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+# also writes a file called 'test.svg' to the Windows Desktop for user 'username'.
+Wrote pydot SVG of graph to: C:\Users\username\Desktop\test.svg
+Nodes: 47, Edges: 48
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
 
 [0]: https://ghidra-sre.org/
 [1]: https://ghidra.re/ghidra_docs/api/ghidra/program/flatapi/FlatProgramAPI.html
