@@ -1,5 +1,5 @@
 # Ghidra Snippets
-*Ghidra Snippets* is a collection of Python examples showing how to work with [Ghidra](https://ghidra-sre.org/) APIs. There are two primary APIs coverted here, the [Flat Program API][1] and the [Flat Decompiler API][2]. The Flat APIs are 'simple' versions of the full fledged Ghidra API. They are a great starting point for anyone looking to develop Ghidra modules and/or scripts.
+*Ghidra Snippets* is a collection of Python examples showing how to work with [Ghidra](https://ghidra-sre.org/) APIs. There are two primary APIs covered here, the [Flat Program API][1] and the [Flat Decompiler API][2]. The Flat APIs are 'simple' versions of the full fledged Ghidra API. They are a great starting point for anyone looking to develop Ghidra modules and/or scripts.
 
 # Latest Release & API Docs
 * Loooking for the latest release of Ghidra? [Download it here][0]. 
@@ -23,7 +23,7 @@ Feel free to submit pull requests to master on this repo with any modifications 
 <details>
 <summary>Working with Programs</summary>
 
-* [`List the current program's name and location on disk`](#list-the-current-program's-name-and-location-on-disk)
+* [`List the current program name and location on disk`](#list-the-current-program-name-and-location-on-disk)
 
 </details>
 
@@ -31,8 +31,8 @@ Feel free to submit pull requests to master on this repo with any modifications 
 <summary>Working with Functions</summary>
 
 * [`Enumerate all functions printing their name and address`](#enumerate-all-functions-printing-their-name-and-address)
-* [`Get a function's name by address`](#get-a-function's-name-by-address)
-* [`Get a function's address by name`](#get-a-function's-address-by-name)
+* [`Get a function name by address`](#get-a-function-name-by-address)
+* [`Get a function address by name`](#get-a-function-address-by-name)
 
 </details>
 
@@ -68,6 +68,8 @@ Feel free to submit pull requests to master on this repo with any modifications 
 A Ghidra *Project* (class [GhidraProject][4]) contains a logical set of program binaries related to a reverse engineering effort. Projects can be shared (collaborative) or non-shared (private). The snippets in this section deal with bulk import and analysis, locating project files on disk, and more.
 
 ### Get the name and location on disk of the current project
+If you're looking to automate analysis using headless scripts you'll likley have to deal with project management. This includes adding binaries to existing projects, cleaning up old projects, or perhaps syncing analysis to shared projects.
+
 ```python
 state = getState()
 project = state.getProject()
@@ -109,6 +111,8 @@ Project URL:           ghidra:/C:/Users/username/Desktop/pcode/pcodeproject
 <br>[⬆ Back to top](#table-of-contents)
 
 ### List all programs in the current project
+A Ghidra project is a logical collection binaries that relate to a specific RE effort. This might be a single executable with multiple shared objects, or multiple executables with numerous third-party libraries, kernel modules, and drivers.
+
 ```python
 state = getState()
 project = state.getProject()
@@ -158,7 +162,7 @@ The project 'pcodeproject' has 4 files in it:
 ## Working with Programs
 A *Program* is a binary component within a Ghidra Project. The snippets in this section deal with gathering information about the Programs within a Project.
 
-### List the current program's name and location on disk
+### List the current program name and location on disk
 ```python
 state = getState()
 currentProgram = state.getCurrentProgram()
@@ -203,7 +207,9 @@ Function: FUN_1400a8e70 @ 0x1400a8e70
 
 <br>[⬆ Back to top](#table-of-contents)
 
-### Get a function's name by address
+### Get a function name by address
+This snippet will help you correlate addresses with associated function names.
+
 ```python
 # helper function to get a Ghidra Address type
 def getAddress(offset):
@@ -242,7 +248,9 @@ main
 
 <br>[⬆ Back to top](#table-of-contents)
 
-### Get a function's address by name
+### Get a function address by name
+Have a name for a function but want the entry point address for it? This will help you do that. Just remember that two or more functions can share the same name (due to function overloading), so Ghidra will return an array (Python list) you have to consider iterating over.
+
 ```python
 # Note that multiple functions can share the same name, so Ghidra's API
 # returns a list of `Function` types. Just keep this in mind.
@@ -267,6 +275,8 @@ main is located at 0x00100690
 ## Working with Instructions
 
 ### Print all instructions in a select function
+Just like `objdump` or a `disas` command in GDB, Ghidra provides a way to dump instructions if you need.  You might do this to generate input for another application, or for documenting issues found during analysis. Whatever you use case might be, you can easily acquire the address, opcodes, and instruction text for a target function, or specific addresses.
+
 ```python
 from binascii import hexlify
 
@@ -379,6 +389,8 @@ Basic block details for function 'main':
 ## Working with the Decompiler
 
 ### Print decompiled code for a specific function
+Ghidra's decompiler is an exceptional resource. In certain cases you might want to extract the decompiler output for a list of functions. Here's an easy way to gather that information.  Just add your own file I/O code to dump everything to individual files for analysis.
+
 ```python
 from ghidra.app.decompiler import DecompInterface
 from ghidra.util.task import ConsoleTaskMonitor
@@ -427,6 +439,8 @@ undefined8 main(void)
 ## Emulating PCode
 
 ### Emulating a function
+Instruction emulation is an extremely powerful technique to asist in static code analysis.  Rarely however, do we have the full memory context in which dynamic code executes. So while emulation can bring an element of 'dynamic' analysis to static RE, it's typically plagued with problems of unknown memory state. For simple code this might be no problem. For object oriented code this can be a major difficulty.  Either way, some element of emulation can help tremendously in speeding up analysis.  Ghidra uses its internal intermediate representation (PCode) to define what instructions do. Emulation is the process of tracking these changes in a cumulative state. Unfortunely Ghidra doesn't provide fancy GUI controls around the emulator (yet), but it's fully scriptable. Ghidra v9.1 added emprovements to the `EmulatorHelper` class, which is really quite amazing. Here's a simple example of what you can do with it.
+
 ```python
 from ghidra.app.emulator import EmulatorHelper
 from ghidra.program.model.symbol import SymbolUtilities
