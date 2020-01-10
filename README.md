@@ -59,6 +59,13 @@ Feel free to submit pull requests to master on this repo with any modifications 
 </details>
 
 <details>
+<summary>Working with Comments</summary>
+
+* [`Get all Automatic comments for a function`](#get-all-automatic-comments-for-a-function)
+
+</details>
+
+<details>
 <summary>Working with PCode</summary>
 
 * [`Emulating a function`](#emulating-a-function)
@@ -467,6 +474,43 @@ undefined8 main(void)
 </details>
 
 <br>[⬆ Back to top](#table-of-contents)
+
+## Working with Comments
+
+### Get all Automatic comments for a function
+
+Ghidra adds "automatic comments" (light gray in color) in the EOL field. Here's how you can access those comments.
+
+```python
+from ghidra.app.util import DisplayableEol
+
+listing = currentProgram.getListing()
+func = getGlobalFunctions("frame_dummy")[0]
+addrSet = func.getBody()
+codeUnits = listing.getCodeUnits(addrSet, True)
+
+for codeUnit in codeUnits:
+	deol = DisplayableEol(codeUnit, True, True, True, True, 5, True)
+	if deol.hasAutomatic():
+		ac = deol.getAutomaticComment()
+		print(type(ac))
+		print(ac)
+		print(ac[0])
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+<type 'array.array'>
+array(java.lang.String, [u'undefined register_tm_clones()'])
+undefined register_tm_clones()
+... snip ...
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
 
 ## Working with PCode
 
