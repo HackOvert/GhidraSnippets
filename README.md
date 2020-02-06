@@ -24,8 +24,10 @@ Feel free to submit pull requests to master on this repo with any modifications 
 <summary>Working with Programs</summary>
 
 * [`List the current program name and location on disk`](#list-the-current-program-name-and-location-on-disk)
+* [`List the name and size of program sections`](#list-the-name-and-size-of-program-sections)
 
 </details>
+
 
 <details>
 <summary>Working with Functions</summary>
@@ -191,6 +193,56 @@ Its location on disk is: '/C:/Users/username/Desktop/pcode/emulation/deobExample
 </details>
 
 <br>[⬆ Back to top](#table-of-contents)
+
+
+### List the name and size of program sections
+```python
+blocks = currentProgram.getMemory().getBlocks()
+for block in blocks:
+	print("Name: {}, Size: {}".format(block.getName(), block.getSize()))
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+Name: segment_2.1, Size: 568
+Name: .interp, Size: 28
+Name: .note.ABI-tag, Size: 32
+Name: .note.gnu.build-id, Size: 36
+Name: .gnu.hash, Size: 36
+Name: .dynsym, Size: 360
+Name: .dynstr, Size: 192
+Name: .gnu.version, Size: 30
+Name: .gnu.version_r, Size: 48
+Name: .rela.dyn, Size: 216
+Name: .rela.plt, Size: 192
+Name: .init, Size: 23
+Name: .plt, Size: 144
+Name: .plt.got, Size: 8
+Name: .text, Size: 706
+Name: .fini, Size: 9
+Name: .rodata, Size: 134
+Name: .eh_frame_hdr, Size: 68
+Name: .eh_frame, Size: 296
+Name: .init_array, Size: 8
+Name: .fini_array, Size: 8
+Name: .dynamic, Size: 496
+Name: .got, Size: 128
+Name: .data, Size: 16
+Name: .bss, Size: 16
+Name: EXTERNAL, Size: 104
+Name: .comment, Size: 43
+Name: .shstrtab, Size: 254
+Name: .strtab, Size: 672
+Name: .symtab, Size: 1728
+Name: _elfSectionHeaders, Size: 1856
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+
 
 
 ## Working with Functions
