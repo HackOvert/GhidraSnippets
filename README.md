@@ -1,5 +1,7 @@
 # Ghidra Snippets
-*Ghidra Snippets* is a collection of Python examples showing how to work with [Ghidra](https://ghidra-sre.org/) APIs. There are two primary APIs covered here, the [Flat Program API][1] and the [Flat Decompiler API][2]. The Flat APIs are 'simple' versions of the full fledged Ghidra API. They are a great starting point for anyone looking to develop Ghidra modules and/or scripts.
+*Ghidra Snippets* is a collection of Python examples showing how to work with [Ghidra](https://ghidra-sre.org/) APIs. There are three primary APIs covered here, the [Flat Program API][1], the [Flat Decompiler API][2], and everything else ("Complex API"). The Flat APIs are 'simple' versions of the full fledged Complex Ghidra API. They are a great starting point for anyone looking to develop Ghidra modules and/or scripts.
+
+At some point however, you need to reach outside of the Flat APIs to do really interesting things. Everything here is just a mashup to get the job done. There's more than one way to accomplish each task so make sure you ask yourself if these snippets are really what you need before copy/pasta.
 
 # Latest Release & API Docs
 * Loooking for the latest release of Ghidra? [Download it here][0]. 
@@ -72,6 +74,13 @@ Feel free to submit pull requests to master on this repo with any modifications 
 
 * [`Emulating a function`](#emulating-a-function)
 * [`Plotting a Function AST`](#plotting-a-function-ast)
+
+</details>
+
+<details>
+<summary>Working with Graphs</summary>
+
+* [`Creating a Call Graph`](#creating-a-call-graph)
 
 </details>
 
@@ -243,17 +252,23 @@ Name: _elfSectionHeaders, Size: 1856
 <br>[⬆ Back to top](#table-of-contents)
 
 
-
-
 ## Working with Functions
 A *Function* is a subroutine within an Program. The snippets in this section deal with gathering information about Functions and modifying them within an Program.
 
 ### Enumerate all functions printing their name and address
+There are at least two ways to do this. The output is the same for each method.
 ```python
+# Method 1:
 func = getFirstFunction()
 while func is not None:
     print("Function: {} @ 0x{}".format(func.getName(), func.getEntryPoint()))
     func = getFunctionAfter(func)
+
+# Method 2:
+fm = currentProgram.getFunctionManager()
+funcs = fm.getFunctions(True) # True means 'forward'
+for func in funcs: 
+    print("Function: {} @ 0x{}".format(func.getName(), func.getEntryPoint()))
 ```
 
 <details>
@@ -860,6 +875,97 @@ main()
 # also writes a file called 'test.svg' to the Windows Desktop for user 'username'.
 Wrote pydot SVG of graph to: C:\Users\username\Desktop\test.svg
 Nodes: 47, Edges: 48
+```
+</details>
+
+
+### Creating a Call Graph
+Ghidra's complex API allows for the creation of various graph structures including directional graphs (digraphs). This example shows how to create a DiGraph of vertices (functions) and edges (calls from/to). 
+
+Note that adding a vertex or an edge between two vertex entries does not reuse or override them! This is because, while many nodes share the same name, they contain unique hash codes (keys). If you were looking to trim this graph to include only unqiue nodes, you would need to conside both the name of the symbol and it's address to account for overridden functions. 
+
+In its current form, this DiGraph is unlikely to be of any use to you. But the building blocks of creating interesting control flow graphs (CFG), program dependence graphs (PDG), data dependency graphs (DDG), and other graphs are all here.
+
+```python
+from ghidra.util.graph import DirectedGraph
+from ghidra.util.graph import Edge
+from ghidra.util.graph import Vertex
+
+def getAddress(offset):
+    return currentProgram.getAddressFactory().getDefaultAddressSpace().getAddress(offset)
+
+digraph = DirectedGraph()
+listing = currentProgram.getListing()
+fm = currentProgram.getFunctionManager()
+
+funcs = fm.getFunctions(True) # True mean iterate forward
+for func in funcs: 
+	# Add function vertices
+	print("Function: {} @ 0x{}".format(func.getName(), func.getEntryPoint())) # FunctionDB
+	digraph.add(Vertex(func))
+	
+	# Add edges for static calls
+	entryPoint = func.getEntryPoint()
+	instructions = listing.getInstructions(entryPoint, True)
+	for instruction in instructions:
+		addr = instruction.getAddress()
+		oper = instruction.getMnemonicString()
+		if oper == "CALL":
+			print("    0x{} : {}".format(addr, instruction))
+			flows = instruction.getFlows()
+			if len(flows) == 1:
+				target_addr = "0x{}".format(flows[0])
+				digraph.add(Edge(Vertex(func), Vertex(fm.getFunctionAt(getAddress(target_addr)))))
+
+print("DiGraph info:")
+edges = digraph.edgeIterator()
+while edges.hasNext():
+	edge = edges.next()
+	from_vertex = edge.from()
+	to_vertex = edge.to()
+	print("  Edge from {} to {}".format(from_vertex, to_vertex))
+
+vertices = digraph.vertexIterator()
+while vertices.hasNext():
+	vertex = vertices.next()
+	print("  Vertex: {} (key: {})".format(vertex, vertex.key()))
+    # some extra stuff you might want to see
+	#print("    type(vertex):      {}".format(type(vertex)))
+	#print("    vertex.hashCode(): {}".format(vertex.hashCode()))
+	#print("    vertex.referent(): {}".format(vertex.referent()))
+	#print("    type(referent):    {}".format(type(vertex.referent())))
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+Function: main @ 0x0010064a
+    0x00100691 : CALL 0x00100520
+    0x001006cc : CALL 0x001004f0
+    0x001006e9 : CALL qword ptr [R12 + RBX*0x8]
+<...snip...>
+
+DiGraph info:
+  Edge from _init to __gmon_start__
+  Edge from _init to __libc_start_main
+  Edge from _init to __cxa_finalize
+  Edge from _init to deregister_tm_clones
+  Edge from _init to printf
+  Edge from _init to _init
+  Edge from printf to __libc_start_main
+  Edge from printf to __cxa_finalize
+  <...snip...>
+  Vertex: _init (key: 3690)
+  Vertex: main (key: 3803)
+  Vertex: main (key: 3804)
+  Vertex: printf (key: 3805)
+  Vertex: main (key: 3807)
+  Vertex: _init (key: 3808)
+  Vertex: __libc_csu_init (key: 3810)
+  Vertex: _init (key: 3812)
+  Vertex: __libc_csu_fini (key: 3814)
+  <...snip...>
 ```
 </details>
 
