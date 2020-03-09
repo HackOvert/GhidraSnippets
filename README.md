@@ -882,7 +882,7 @@ Nodes: 47, Edges: 48
 ### Creating a Call Graph
 Ghidra's complex API allows for the creation of various graph structures including directional graphs (digraphs). This example shows how to create a DiGraph of vertices (functions) and edges (calls from/to). 
 
-Note that adding a vertex or an edge between two vertex entries does not reuse or override them! This is because, while many nodes share the same name, they contain unique hash codes (keys). If you were looking to trim this graph to include only unqiue nodes, you would need to conside both the name of the symbol and it's address to account for overridden functions. 
+Note that adding a vertex or an edge between two vertex entries does not reuse or override them! This is because, while many nodes share the same name, they contain unique hash codes (keys). If you were looking to trim this graph to include only unqiue nodes, you would need to consider both the name of the symbol and its address to account for overridden functions. 
 
 In its current form, this DiGraph is unlikely to be of any use to you. But the building blocks of creating interesting control flow graphs (CFG), program dependence graphs (PDG), data dependency graphs (DDG), and other graphs are all here.
 
