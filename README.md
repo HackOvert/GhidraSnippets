@@ -73,6 +73,7 @@ Feel free to submit pull requests to master on this repo with any modifications 
 <summary>Working with PCode</summary>
 
 * [`Emulating a function`](#emulating-a-function)
+* [`Dumping Raw PCode`](#dumping-raw-pcode)
 * [`Dumping Refined PCode`](#dumping-refined-pcode)
 * [`Plotting a Function AST`](#plotting-a-function-ast)
 
@@ -753,6 +754,256 @@ Address: 0x00100698 (MOV dword ptr [RBP + -0x24],EDI)
 </details>
 
 <br>[⬆ Back to top](#table-of-contents)
+
+
+### Dumping Raw PCode
+PCode exists in two primary forms you as a user should consider, "raw" and "refined".  In documentation both forms are simply referred to as "PCode" making it confusing to talk about - so I distinguish between the forms using raw and refined. Just know theses are not universally accepted terms. 
+
+So raw PCode is the first pass, and the form that's displayed in the "Listing" pane inside the Ghidra UI.  It's extremely verbose and explicit. This is the form you want to use when emulating, if you're writing a symbolic executor, or anything of the sort.  If you want details from the decompiler passes, you want to analyze refined PCode, not this stuff!  So what does it look like and how do you access it? Let's take a look.
+
+```python
+def dump_raw_pcode(func):
+    func_body = func.getBody()
+    listing = currentProgram.getListing()
+    opiter = listing.getInstructions(func_body, True)
+    while opiter.hasNext():
+        op = opiter.next()
+        raw_pcode = op.getPcode()
+        print("{}".format(op))
+        for entry in raw_pcode:
+            print("  {}".format(entry))
+
+func = getGlobalFunctions("main")[0]    # assumes only one function named `main`
+dump_raw_pcode(func)            	    # dump raw pcode as strings
+```
+
+<details>
+<summary>Output example</summary>
+
+Note that this looks different from the raw pcode you'll see in the UI (if you enable the PCode field) but it is exactly the same. It's just not formatted to print the same.  Please run this against your own target function and you'll see what I mean.
+
+```
+PUSH RBP
+  (unique, 0x2510, 8) COPY (register, 0x28, 8)
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (unique, 0x2510, 8)
+MOV RBP,RSP
+  (register, 0x28, 8) COPY (register, 0x20, 8)
+SUB RSP,0x50
+  (register, 0x200, 1) INT_LESS (register, 0x20, 8) , (const, 0x50, 8)
+  (register, 0x20b, 1) INT_SBORROW (register, 0x20, 8) , (const, 0x50, 8)
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x50, 8)
+  (register, 0x207, 1) INT_SLESS (register, 0x20, 8) , (const, 0x0, 8)
+  (register, 0x206, 1) INT_EQUAL (register, 0x20, 8) , (const, 0x0, 8)
+MOV dword ptr [RBP + -0x44],EDI
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffbc, 8)
+  (unique, 0x1fd0, 4) COPY (register, 0x38, 4)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1fd0, 4)
+MOV qword ptr [RBP + -0x50],RSI
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffb0, 8)
+  (unique, 0x1ff0, 8) COPY (register, 0x30, 8)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1ff0, 8)
+MOV RAX,qword ptr FS:[0x28]
+  (unique, 0x9e0, 8) INT_ADD (register, 0x110, 8) , (const, 0x28, 8)
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x9e0, 8)
+  (register, 0x0, 8) COPY (unique, 0x1ff0, 8)
+MOV qword ptr [RBP + -0x8],RAX
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xfffffffffffffff8, 8)
+  (unique, 0x1ff0, 8) COPY (register, 0x0, 8)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1ff0, 8)
+XOR EAX,EAX
+  (register, 0x200, 1) COPY (const, 0x0, 1)
+  (register, 0x20b, 1) COPY (const, 0x0, 1)
+  (register, 0x0, 4) INT_XOR (register, 0x0, 4) , (register, 0x0, 4)
+  (register, 0x0, 8) INT_ZEXT (register, 0x0, 4)
+  (register, 0x207, 1) INT_SLESS (register, 0x0, 4) , (const, 0x0, 4)
+  (register, 0x206, 1) INT_EQUAL (register, 0x0, 4) , (const, 0x0, 4)
+CMP dword ptr [RBP + -0x44],0x1
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffbc, 8)
+  (unique, 0x1fe0, 4) LOAD (const, 0x1b1, 4) , (unique, 0x620, 8)
+  (register, 0x200, 1) INT_LESS (unique, 0x1fe0, 4) , (const, 0x1, 4)
+  (unique, 0x1fe0, 4) LOAD (const, 0x1b1, 4) , (unique, 0x620, 8)
+  (register, 0x20b, 1) INT_SBORROW (unique, 0x1fe0, 4) , (const, 0x1, 4)
+  (unique, 0x1fe0, 4) LOAD (const, 0x1b1, 4) , (unique, 0x620, 8)
+  (unique, 0x5950, 4) INT_SUB (unique, 0x1fe0, 4) , (const, 0x1, 4)
+  (register, 0x207, 1) INT_SLESS (unique, 0x5950, 4) , (const, 0x0, 4)
+  (register, 0x206, 1) INT_EQUAL (unique, 0x5950, 4) , (const, 0x0, 4)
+JG 0x00100743
+  (unique, 0x2220, 1) BOOL_NEGATE (register, 0x206, 1)
+  (unique, 0x2230, 1) INT_EQUAL (register, 0x20b, 1) , (register, 0x207, 1)
+  (unique, 0x2250, 1) BOOL_AND (unique, 0x2220, 1) , (unique, 0x2230, 1)
+   ---  CBRANCH (ram, 0x100743, 8) , (unique, 0x2250, 1)
+MOV RAX,qword ptr [RBP + -0x50]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffb0, 8)
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x620, 8)
+  (register, 0x0, 8) COPY (unique, 0x1ff0, 8)
+MOV RAX,qword ptr [RAX]
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (register, 0x0, 8)
+  (register, 0x0, 8) COPY (unique, 0x1ff0, 8)
+MOV RSI,RAX
+  (register, 0x30, 8) COPY (register, 0x0, 8)
+LEA RDI,[0x1008a4]
+  (register, 0x38, 8) COPY (const, 0x1008a4, 8)
+MOV EAX,0x0
+  (register, 0x0, 8) COPY (const, 0x0, 8)
+CALL 0x001005d0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x100739, 8)
+   ---  CALL (ram, 0x1005d0, 8)
+MOV EAX,0x1
+  (register, 0x0, 8) COPY (const, 0x1, 8)
+JMP 0x001007ff
+   ---  BRANCH (ram, 0x1007ff, 8)
+MOV RAX,0x4242424241414141
+  (register, 0x0, 8) COPY (const, 0x4242424241414141, 8)
+MOV qword ptr [RBP + -0x1c],RAX
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffe4, 8)
+  (unique, 0x1ff0, 8) COPY (register, 0x0, 8)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1ff0, 8)
+MOV word ptr [RBP + -0x14],0x43
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffec, 8)
+  (unique, 0x1fc0, 2) COPY (const, 0x43, 2)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1fc0, 2)
+MOV qword ptr [RBP + -0x2c],0x0
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffd4, 8)
+  (unique, 0x2000, 8) COPY (const, 0x0, 8)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x2000, 8)
+LEA RDX,[RBP + -0x1c]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffe4, 8)
+  (register, 0x10, 8) COPY (unique, 0x620, 8)
+LEA RAX,[RBP + -0x2c]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffd4, 8)
+  (register, 0x0, 8) COPY (unique, 0x620, 8)
+MOV RSI,RDX
+  (register, 0x30, 8) COPY (register, 0x10, 8)
+MOV RDI,RAX
+  (register, 0x38, 8) COPY (register, 0x0, 8)
+CALL 0x001005b0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x100772, 8)
+   ---  CALL (ram, 0x1005b0, 8)
+LEA RAX,[RBP + -0x2c]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffd4, 8)
+  (register, 0x0, 8) COPY (unique, 0x620, 8)
+MOV RSI,RAX
+  (register, 0x30, 8) COPY (register, 0x0, 8)
+LEA RDI,[0x1008b6]
+  (register, 0x38, 8) COPY (const, 0x1008b6, 8)
+MOV EAX,0x0
+  (register, 0x0, 8) COPY (const, 0x0, 8)
+CALL 0x001005d0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x10078a, 8)
+   ---  CALL (ram, 0x1005d0, 8)
+MOV qword ptr [RBP + -0x24],0x0
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffdc, 8)
+  (unique, 0x2000, 8) COPY (const, 0x0, 8)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x2000, 8)
+MOV RAX,qword ptr [RBP + -0x50]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffb0, 8)
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x620, 8)
+  (register, 0x0, 8) COPY (unique, 0x1ff0, 8)
+ADD RAX,0x8
+  (register, 0x200, 1) INT_CARRY (register, 0x0, 8) , (const, 0x8, 8)
+  (register, 0x20b, 1) INT_SCARRY (register, 0x0, 8) , (const, 0x8, 8)
+  (register, 0x0, 8) INT_ADD (register, 0x0, 8) , (const, 0x8, 8)
+  (register, 0x207, 1) INT_SLESS (register, 0x0, 8) , (const, 0x0, 8)
+  (register, 0x206, 1) INT_EQUAL (register, 0x0, 8) , (const, 0x0, 8)
+MOV RDX,qword ptr [RAX]
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (register, 0x0, 8)
+  (register, 0x10, 8) COPY (unique, 0x1ff0, 8)
+LEA RAX,[RBP + -0x24]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffdc, 8)
+  (register, 0x0, 8) COPY (unique, 0x620, 8)
+MOV RSI,RDX
+  (register, 0x30, 8) COPY (register, 0x10, 8)
+MOV RDI,RAX
+  (register, 0x38, 8) COPY (register, 0x0, 8)
+CALL 0x001005b0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x1007ac, 8)
+   ---  CALL (ram, 0x1005b0, 8)
+LEA RAX,[RBP + -0x24]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffdc, 8)
+  (register, 0x0, 8) COPY (unique, 0x620, 8)
+MOV RSI,RAX
+  (register, 0x30, 8) COPY (register, 0x0, 8)
+LEA RDI,[0x1008c2]
+  (register, 0x38, 8) COPY (const, 0x1008c2, 8)
+MOV EAX,0x0
+  (register, 0x0, 8) COPY (const, 0x0, 8)
+CALL 0x001005d0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x1007c4, 8)
+   ---  CALL (ram, 0x1005d0, 8)
+MOV dword ptr [RBP + -0x31],0x39393939
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffcf, 8)
+  (unique, 0x1fe0, 4) COPY (const, 0x39393939, 4)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1fe0, 4)
+MOV byte ptr [RBP + -0x2d],0x0
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffd3, 8)
+  (unique, 0x1fa0, 1) COPY (const, 0x0, 1)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1fa0, 1)
+LEA RDX,[RBP + -0x31]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffcf, 8)
+  (register, 0x10, 8) COPY (unique, 0x620, 8)
+LEA RAX,[RBP + -0x12]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffee, 8)
+  (register, 0x0, 8) COPY (unique, 0x620, 8)
+MOV RSI,RDX
+  (register, 0x30, 8) COPY (register, 0x10, 8)
+MOV RDI,RAX
+  (register, 0x38, 8) COPY (register, 0x0, 8)
+CALL 0x001005b0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x1007e2, 8)
+   ---  CALL (ram, 0x1005b0, 8)
+LEA RAX,[RBP + -0x12]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffee, 8)
+  (register, 0x0, 8) COPY (unique, 0x620, 8)
+MOV RSI,RAX
+  (register, 0x30, 8) COPY (register, 0x0, 8)
+LEA RDI,[0x1008cf]
+  (register, 0x38, 8) COPY (const, 0x1008cf, 8)
+MOV EAX,0x0
+  (register, 0x0, 8) COPY (const, 0x0, 8)
+CALL 0x001005d0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x1007fa, 8)
+   ---  CALL (ram, 0x1005d0, 8)
+MOV EAX,0x0
+  (register, 0x0, 8) COPY (const, 0x0, 8)
+MOV RCX,qword ptr [RBP + -0x8]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xfffffffffffffff8, 8)
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x620, 8)
+  (register, 0x8, 8) COPY (unique, 0x1ff0, 8)
+XOR RCX,qword ptr FS:[0x28]
+  (unique, 0x9e0, 8) INT_ADD (register, 0x110, 8) , (const, 0x28, 8)
+  (register, 0x200, 1) COPY (const, 0x0, 1)
+  (register, 0x20b, 1) COPY (const, 0x0, 1)
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x9e0, 8)
+  (register, 0x8, 8) INT_XOR (register, 0x8, 8) , (unique, 0x1ff0, 8)
+  (register, 0x207, 1) INT_SLESS (register, 0x8, 8) , (const, 0x0, 8)
+  (register, 0x206, 1) INT_EQUAL (register, 0x8, 8) , (const, 0x0, 8)
+JZ 0x00100813
+   ---  CBRANCH (ram, 0x100813, 8) , (register, 0x206, 1)
+CALL 0x001005c0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x100813, 8)
+   ---  CALL (ram, 0x1005c0, 8)
+LEAVE
+  (register, 0x20, 8) COPY (register, 0x28, 8)
+  (register, 0x28, 8) LOAD (const, 0x1b1, 8) , (register, 0x20, 8)
+  (register, 0x20, 8) INT_ADD (register, 0x20, 8) , (const, 0x8, 8)
+RET
+  (register, 0x288, 8) LOAD (const, 0x1b1, 8) , (register, 0x20, 8)
+  (register, 0x20, 8) INT_ADD (register, 0x20, 8) , (const, 0x8, 8)
+   ---  RETURN (register, 0x288, 8)
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
 
 ### Dumping Refined PCode
 PCode exists in two primary forms you as a user should consider, "raw" and "refined".  In documentation both forms are simply referred to as "PCode" making it confusing to talk about - so I distinguish between the forms using raw and refined. Just know theses are not universally accepted terms. 
