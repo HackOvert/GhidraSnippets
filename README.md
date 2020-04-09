@@ -73,6 +73,8 @@ Feel free to submit pull requests to master on this repo with any modifications 
 <summary>Working with PCode</summary>
 
 * [`Emulating a function`](#emulating-a-function)
+* [`Dumping Raw PCode`](#dumping-raw-pcode)
+* [`Dumping Refined PCode`](#dumping-refined-pcode)
 * [`Plotting a Function AST`](#plotting-a-function-ast)
 
 </details>
@@ -83,6 +85,14 @@ Feel free to submit pull requests to master on this repo with any modifications 
 * [`Creating a Call Graph`](#creating-a-call-graph)
 
 </details>
+
+<details>
+<summary>Miscellaneous</summary>
+
+* [`Program Slices`](#program-slices)
+
+</details>
+
 
 ## Working with Projects
 A Ghidra *Project* (class [GhidraProject][4]) contains a logical set of program binaries related to a reverse engineering effort. Projects can be shared (collaborative) or non-shared (private). The snippets in this section deal with bulk import and analysis, locating project files on disk, and more.
@@ -746,6 +756,410 @@ Address: 0x00100698 (MOV dword ptr [RBP + -0x24],EDI)
 <br>[⬆ Back to top](#table-of-contents)
 
 
+### Dumping Raw PCode
+PCode exists in two primary forms you as a user should consider, "raw" and "refined".  In documentation both forms are simply referred to as "PCode" making it confusing to talk about - so I distinguish between the forms using raw and refined. Just know theses are not universally accepted terms. 
+
+So raw PCode is the first pass, and the form that's displayed in the "Listing" pane inside the Ghidra UI.  It's extremely verbose and explicit. This is the form you want to use when emulating, if you're writing a symbolic executor, or anything of the sort.  If you want details from the decompiler passes, you want to analyze refined PCode, not this stuff!  So what does it look like and how do you access it? Let's take a look.
+
+```python
+def dump_raw_pcode(func):
+    func_body = func.getBody()
+    listing = currentProgram.getListing()
+    opiter = listing.getInstructions(func_body, True)
+    while opiter.hasNext():
+        op = opiter.next()
+        raw_pcode = op.getPcode()
+        print("{}".format(op))
+        for entry in raw_pcode:
+            print("  {}".format(entry))
+
+func = getGlobalFunctions("main")[0]    # assumes only one function named `main`
+dump_raw_pcode(func)            	    # dump raw pcode as strings
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+PUSH RBP
+  (unique, 0x2510, 8) COPY (register, 0x28, 8)
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (unique, 0x2510, 8)
+MOV RBP,RSP
+  (register, 0x28, 8) COPY (register, 0x20, 8)
+SUB RSP,0x50
+  (register, 0x200, 1) INT_LESS (register, 0x20, 8) , (const, 0x50, 8)
+  (register, 0x20b, 1) INT_SBORROW (register, 0x20, 8) , (const, 0x50, 8)
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x50, 8)
+  (register, 0x207, 1) INT_SLESS (register, 0x20, 8) , (const, 0x0, 8)
+  (register, 0x206, 1) INT_EQUAL (register, 0x20, 8) , (const, 0x0, 8)
+MOV dword ptr [RBP + -0x44],EDI
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffbc, 8)
+  (unique, 0x1fd0, 4) COPY (register, 0x38, 4)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1fd0, 4)
+MOV qword ptr [RBP + -0x50],RSI
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffb0, 8)
+  (unique, 0x1ff0, 8) COPY (register, 0x30, 8)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1ff0, 8)
+MOV RAX,qword ptr FS:[0x28]
+  (unique, 0x9e0, 8) INT_ADD (register, 0x110, 8) , (const, 0x28, 8)
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x9e0, 8)
+  (register, 0x0, 8) COPY (unique, 0x1ff0, 8)
+MOV qword ptr [RBP + -0x8],RAX
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xfffffffffffffff8, 8)
+  (unique, 0x1ff0, 8) COPY (register, 0x0, 8)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1ff0, 8)
+XOR EAX,EAX
+  (register, 0x200, 1) COPY (const, 0x0, 1)
+  (register, 0x20b, 1) COPY (const, 0x0, 1)
+  (register, 0x0, 4) INT_XOR (register, 0x0, 4) , (register, 0x0, 4)
+  (register, 0x0, 8) INT_ZEXT (register, 0x0, 4)
+  (register, 0x207, 1) INT_SLESS (register, 0x0, 4) , (const, 0x0, 4)
+  (register, 0x206, 1) INT_EQUAL (register, 0x0, 4) , (const, 0x0, 4)
+CMP dword ptr [RBP + -0x44],0x1
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffbc, 8)
+  (unique, 0x1fe0, 4) LOAD (const, 0x1b1, 4) , (unique, 0x620, 8)
+  (register, 0x200, 1) INT_LESS (unique, 0x1fe0, 4) , (const, 0x1, 4)
+  (unique, 0x1fe0, 4) LOAD (const, 0x1b1, 4) , (unique, 0x620, 8)
+  (register, 0x20b, 1) INT_SBORROW (unique, 0x1fe0, 4) , (const, 0x1, 4)
+  (unique, 0x1fe0, 4) LOAD (const, 0x1b1, 4) , (unique, 0x620, 8)
+  (unique, 0x5950, 4) INT_SUB (unique, 0x1fe0, 4) , (const, 0x1, 4)
+  (register, 0x207, 1) INT_SLESS (unique, 0x5950, 4) , (const, 0x0, 4)
+  (register, 0x206, 1) INT_EQUAL (unique, 0x5950, 4) , (const, 0x0, 4)
+JG 0x00100743
+  (unique, 0x2220, 1) BOOL_NEGATE (register, 0x206, 1)
+  (unique, 0x2230, 1) INT_EQUAL (register, 0x20b, 1) , (register, 0x207, 1)
+  (unique, 0x2250, 1) BOOL_AND (unique, 0x2220, 1) , (unique, 0x2230, 1)
+   ---  CBRANCH (ram, 0x100743, 8) , (unique, 0x2250, 1)
+MOV RAX,qword ptr [RBP + -0x50]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffb0, 8)
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x620, 8)
+  (register, 0x0, 8) COPY (unique, 0x1ff0, 8)
+MOV RAX,qword ptr [RAX]
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (register, 0x0, 8)
+  (register, 0x0, 8) COPY (unique, 0x1ff0, 8)
+MOV RSI,RAX
+  (register, 0x30, 8) COPY (register, 0x0, 8)
+LEA RDI,[0x1008a4]
+  (register, 0x38, 8) COPY (const, 0x1008a4, 8)
+MOV EAX,0x0
+  (register, 0x0, 8) COPY (const, 0x0, 8)
+CALL 0x001005d0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x100739, 8)
+   ---  CALL (ram, 0x1005d0, 8)
+MOV EAX,0x1
+  (register, 0x0, 8) COPY (const, 0x1, 8)
+JMP 0x001007ff
+   ---  BRANCH (ram, 0x1007ff, 8)
+MOV RAX,0x4242424241414141
+  (register, 0x0, 8) COPY (const, 0x4242424241414141, 8)
+MOV qword ptr [RBP + -0x1c],RAX
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffe4, 8)
+  (unique, 0x1ff0, 8) COPY (register, 0x0, 8)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1ff0, 8)
+MOV word ptr [RBP + -0x14],0x43
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffec, 8)
+  (unique, 0x1fc0, 2) COPY (const, 0x43, 2)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1fc0, 2)
+MOV qword ptr [RBP + -0x2c],0x0
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffd4, 8)
+  (unique, 0x2000, 8) COPY (const, 0x0, 8)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x2000, 8)
+LEA RDX,[RBP + -0x1c]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffe4, 8)
+  (register, 0x10, 8) COPY (unique, 0x620, 8)
+LEA RAX,[RBP + -0x2c]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffd4, 8)
+  (register, 0x0, 8) COPY (unique, 0x620, 8)
+MOV RSI,RDX
+  (register, 0x30, 8) COPY (register, 0x10, 8)
+MOV RDI,RAX
+  (register, 0x38, 8) COPY (register, 0x0, 8)
+CALL 0x001005b0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x100772, 8)
+   ---  CALL (ram, 0x1005b0, 8)
+LEA RAX,[RBP + -0x2c]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffd4, 8)
+  (register, 0x0, 8) COPY (unique, 0x620, 8)
+MOV RSI,RAX
+  (register, 0x30, 8) COPY (register, 0x0, 8)
+LEA RDI,[0x1008b6]
+  (register, 0x38, 8) COPY (const, 0x1008b6, 8)
+MOV EAX,0x0
+  (register, 0x0, 8) COPY (const, 0x0, 8)
+CALL 0x001005d0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x10078a, 8)
+   ---  CALL (ram, 0x1005d0, 8)
+MOV qword ptr [RBP + -0x24],0x0
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffdc, 8)
+  (unique, 0x2000, 8) COPY (const, 0x0, 8)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x2000, 8)
+MOV RAX,qword ptr [RBP + -0x50]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffb0, 8)
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x620, 8)
+  (register, 0x0, 8) COPY (unique, 0x1ff0, 8)
+ADD RAX,0x8
+  (register, 0x200, 1) INT_CARRY (register, 0x0, 8) , (const, 0x8, 8)
+  (register, 0x20b, 1) INT_SCARRY (register, 0x0, 8) , (const, 0x8, 8)
+  (register, 0x0, 8) INT_ADD (register, 0x0, 8) , (const, 0x8, 8)
+  (register, 0x207, 1) INT_SLESS (register, 0x0, 8) , (const, 0x0, 8)
+  (register, 0x206, 1) INT_EQUAL (register, 0x0, 8) , (const, 0x0, 8)
+MOV RDX,qword ptr [RAX]
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (register, 0x0, 8)
+  (register, 0x10, 8) COPY (unique, 0x1ff0, 8)
+LEA RAX,[RBP + -0x24]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffdc, 8)
+  (register, 0x0, 8) COPY (unique, 0x620, 8)
+MOV RSI,RDX
+  (register, 0x30, 8) COPY (register, 0x10, 8)
+MOV RDI,RAX
+  (register, 0x38, 8) COPY (register, 0x0, 8)
+CALL 0x001005b0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x1007ac, 8)
+   ---  CALL (ram, 0x1005b0, 8)
+LEA RAX,[RBP + -0x24]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffdc, 8)
+  (register, 0x0, 8) COPY (unique, 0x620, 8)
+MOV RSI,RAX
+  (register, 0x30, 8) COPY (register, 0x0, 8)
+LEA RDI,[0x1008c2]
+  (register, 0x38, 8) COPY (const, 0x1008c2, 8)
+MOV EAX,0x0
+  (register, 0x0, 8) COPY (const, 0x0, 8)
+CALL 0x001005d0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x1007c4, 8)
+   ---  CALL (ram, 0x1005d0, 8)
+MOV dword ptr [RBP + -0x31],0x39393939
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffcf, 8)
+  (unique, 0x1fe0, 4) COPY (const, 0x39393939, 4)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1fe0, 4)
+MOV byte ptr [RBP + -0x2d],0x0
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffd3, 8)
+  (unique, 0x1fa0, 1) COPY (const, 0x0, 1)
+   ---  STORE (const, 0x1b1, 4) , (unique, 0x620, 8) , (unique, 0x1fa0, 1)
+LEA RDX,[RBP + -0x31]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffcf, 8)
+  (register, 0x10, 8) COPY (unique, 0x620, 8)
+LEA RAX,[RBP + -0x12]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffee, 8)
+  (register, 0x0, 8) COPY (unique, 0x620, 8)
+MOV RSI,RDX
+  (register, 0x30, 8) COPY (register, 0x10, 8)
+MOV RDI,RAX
+  (register, 0x38, 8) COPY (register, 0x0, 8)
+CALL 0x001005b0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x1007e2, 8)
+   ---  CALL (ram, 0x1005b0, 8)
+LEA RAX,[RBP + -0x12]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xffffffffffffffee, 8)
+  (register, 0x0, 8) COPY (unique, 0x620, 8)
+MOV RSI,RAX
+  (register, 0x30, 8) COPY (register, 0x0, 8)
+LEA RDI,[0x1008cf]
+  (register, 0x38, 8) COPY (const, 0x1008cf, 8)
+MOV EAX,0x0
+  (register, 0x0, 8) COPY (const, 0x0, 8)
+CALL 0x001005d0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x1007fa, 8)
+   ---  CALL (ram, 0x1005d0, 8)
+MOV EAX,0x0
+  (register, 0x0, 8) COPY (const, 0x0, 8)
+MOV RCX,qword ptr [RBP + -0x8]
+  (unique, 0x620, 8) INT_ADD (register, 0x28, 8) , (const, 0xfffffffffffffff8, 8)
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x620, 8)
+  (register, 0x8, 8) COPY (unique, 0x1ff0, 8)
+XOR RCX,qword ptr FS:[0x28]
+  (unique, 0x9e0, 8) INT_ADD (register, 0x110, 8) , (const, 0x28, 8)
+  (register, 0x200, 1) COPY (const, 0x0, 1)
+  (register, 0x20b, 1) COPY (const, 0x0, 1)
+  (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x9e0, 8)
+  (register, 0x8, 8) INT_XOR (register, 0x8, 8) , (unique, 0x1ff0, 8)
+  (register, 0x207, 1) INT_SLESS (register, 0x8, 8) , (const, 0x0, 8)
+  (register, 0x206, 1) INT_EQUAL (register, 0x8, 8) , (const, 0x0, 8)
+JZ 0x00100813
+   ---  CBRANCH (ram, 0x100813, 8) , (register, 0x206, 1)
+CALL 0x001005c0
+  (register, 0x20, 8) INT_SUB (register, 0x20, 8) , (const, 0x8, 8)
+   ---  STORE (const, 0x1b1, 8) , (register, 0x20, 8) , (const, 0x100813, 8)
+   ---  CALL (ram, 0x1005c0, 8)
+LEAVE
+  (register, 0x20, 8) COPY (register, 0x28, 8)
+  (register, 0x28, 8) LOAD (const, 0x1b1, 8) , (register, 0x20, 8)
+  (register, 0x20, 8) INT_ADD (register, 0x20, 8) , (const, 0x8, 8)
+RET
+  (register, 0x288, 8) LOAD (const, 0x1b1, 8) , (register, 0x20, 8)
+  (register, 0x20, 8) INT_ADD (register, 0x20, 8) , (const, 0x8, 8)
+   ---  RETURN (register, 0x288, 8)
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+
+### Dumping Refined PCode
+PCode exists in two primary forms you as a user should consider, "raw" and "refined".  In documentation both forms are simply referred to as "PCode" making it confusing to talk about - so I distinguish between the forms using raw and refined. Just know theses are not universally accepted terms. 
+
+So refined PCode is heavily processed. It highly relates to the output you see in the decompiler, and if you're interested in making use of the Ghidra decompiler passes, this is the form of PCode you'll want to analyze. There are many interesting aspects of refined PCode we do not cover here, including `unique` values and name spaces. Just know that what might appear to be simple has a lot of analysis backing it and digging into these refined PCode elements are worth your time.
+
+```python
+from ghidra.util.task import ConsoleTaskMonitor
+from ghidra.app.decompiler import DecompileOptions, DecompInterface
+
+# == helper functions =============================================================================
+def get_high_function(func):
+    options = DecompileOptions()
+    monitor = ConsoleTaskMonitor()
+    ifc = DecompInterface()
+    ifc.setOptions(options)
+    ifc.openProgram(getCurrentProgram())
+    # Setting a simplification style will strip useful `indirect` information.
+    # Please don't use this unless you know why you're using it.
+    #ifc.setSimplificationStyle("normalize") 
+    res = ifc.decompileFunction(func, 60, monitor)
+    high = res.getHighFunction()
+    return high
+
+def dump_refined_pcode(func, high_func):
+    opiter = high_func.getPcodeOps()
+    while opiter.hasNext():
+        op = opiter.next()
+        print("{}".format(op.toString()))
+        
+# == run examples =================================================================================
+func = getGlobalFunctions("main")[0]    # assumes only one function named `main`
+hf = get_high_function(func)            # we need a high function from the decompiler
+dump_refined_pcode(func, hf)            # dump straight refined pcode as strings
+```
+
+<details>
+<summary>Output example</summary>
+
+Notice how this looks quite different than the raw PCode.
+
+```
+(unique, 0x10000110, 8) INT_ADD (register, 0x110, 8) , (const, 0x28, 8)
+(unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x9e0, 8)
+(unique, 0x9e0, 8) CAST (unique, 0x10000110, 8)
+(unique, 0x2250, 1) INT_SLESS (register, 0x38, 4) , (const, 0x2, 4)
+ ---  CBRANCH (ram, 0x100743, 1) , (unique, 0x2250, 1)
+(unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (register, 0x30, 8)
+ ---  CALL (ram, 0x1005d0, 8) , (unique, 0x100000a8, 8) , (unique, 0x1ff0, 8)
+(register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x32, 4)
+(stack, 0xffffffffffffffc7, 4) INDIRECT (stack, 0xffffffffffffffc7, 4) , (const, 0x32, 4)
+(stack, 0xffffffffffffffcb, 1) INDIRECT (stack, 0xffffffffffffffcb, 1) , (const, 0x32, 4)
+(stack, 0xffffffffffffffcc, 8) INDIRECT (stack, 0xffffffffffffffcc, 8) , (const, 0x32, 4)
+(stack, 0xffffffffffffffd4, 8) INDIRECT (stack, 0xffffffffffffffd4, 8) , (const, 0x32, 4)
+(stack, 0xffffffffffffffdc, 8) INDIRECT (stack, 0xffffffffffffffdc, 8) , (const, 0x32, 4)
+(stack, 0xffffffffffffffe4, 2) INDIRECT (stack, 0xffffffffffffffe4, 2) , (const, 0x32, 4)
+(stack, 0xfffffffffffffff0, 8) INDIRECT (unique, 0x1ff0, 8) , (const, 0x32, 4)
+(unique, 0x100000a8, 8) COPY (const, 0x1008a4, 8)
+ ---  BRANCH (ram, 0x1007ff, 1)
+(stack, 0xffffffffffffffdc, 8) COPY (const, 0x4242424241414141, 8)
+(stack, 0xffffffffffffffe4, 2) COPY (const, 0x43, 2)
+(stack, 0xffffffffffffffcc, 8) COPY (const, 0x0, 8)
+(unique, 0x620, 8) PTRSUB (register, 0x20, 8) , (const, 0xffffffffffffffdc, 8)
+(unique, 0x620, 8) PTRSUB (register, 0x20, 8) , (const, 0xffffffffffffffcc, 8)
+ ---  CALL (ram, 0x1005b0, 8) , (unique, 0x10000118, 8) , (unique, 0x10000120, 8)
+(register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x5d, 4)
+(stack, 0xffffffffffffffcc, 8) INDIRECT (stack, 0xffffffffffffffcc, 8) , (const, 0x5d, 4)
+(stack, 0xffffffffffffffdc, 8) INDIRECT (stack, 0xffffffffffffffdc, 8) , (const, 0x5d, 4)
+(stack, 0xffffffffffffffe4, 2) INDIRECT (stack, 0xffffffffffffffe4, 2) , (const, 0x5d, 4)
+(stack, 0xfffffffffffffff0, 8) INDIRECT (unique, 0x1ff0, 8) , (const, 0x5d, 4)
+(unique, 0x10000118, 8) CAST (unique, 0x620, 8)
+(unique, 0x10000120, 8) CAST (unique, 0x620, 8)
+(unique, 0x620, 8) PTRSUB (register, 0x20, 8) , (const, 0xffffffffffffffcc, 8)
+ ---  CALL (ram, 0x1005d0, 8) , (unique, 0x100000b0, 8) , (unique, 0x620, 8)
+(register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x65, 4)
+(stack, 0xffffffffffffffcc, 8) INDIRECT (stack, 0xffffffffffffffcc, 8) , (const, 0x65, 4)
+(stack, 0xffffffffffffffdc, 8) INDIRECT (stack, 0xffffffffffffffdc, 8) , (const, 0x65, 4)
+(stack, 0xffffffffffffffe4, 2) INDIRECT (stack, 0xffffffffffffffe4, 2) , (const, 0x65, 4)
+(stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x65, 4)
+(unique, 0x100000b0, 8) COPY (const, 0x1008b6, 8)
+(stack, 0xffffffffffffffd4, 8) COPY (const, 0x0, 8)
+(register, 0x0, 8) PTRADD (register, 0x30, 8) , (const, 0x1, 8) , (const, 0x8, 8)
+(unique, 0x10000128, 8) LOAD (const, 0x1b1, 4) , (register, 0x0, 8)
+(unique, 0x1ff0, 8) CAST (unique, 0x10000128, 8)
+(unique, 0x620, 8) PTRSUB (register, 0x20, 8) , (const, 0xffffffffffffffd4, 8)
+ ---  CALL (ram, 0x1005b0, 8) , (unique, 0x10000130, 8) , (unique, 0x1ff0, 8)
+(register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x79, 4)
+(stack, 0xffffffffffffffcc, 8) INDIRECT (stack, 0xffffffffffffffcc, 8) , (const, 0x79, 4)
+(stack, 0xffffffffffffffd4, 8) INDIRECT (stack, 0xffffffffffffffd4, 8) , (const, 0x79, 4)
+(stack, 0xffffffffffffffdc, 8) INDIRECT (stack, 0xffffffffffffffdc, 8) , (const, 0x79, 4)
+(stack, 0xffffffffffffffe4, 2) INDIRECT (stack, 0xffffffffffffffe4, 2) , (const, 0x79, 4)
+(stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x79, 4)
+(unique, 0x10000130, 8) CAST (unique, 0x620, 8)
+(unique, 0x620, 8) PTRSUB (register, 0x20, 8) , (const, 0xffffffffffffffd4, 8)
+ ---  CALL (ram, 0x1005d0, 8) , (unique, 0x100000b8, 8) , (unique, 0x620, 8)
+(register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x81, 4)
+(stack, 0xffffffffffffffcc, 8) INDIRECT (stack, 0xffffffffffffffcc, 8) , (const, 0x81, 4)
+(stack, 0xffffffffffffffd4, 8) INDIRECT (stack, 0xffffffffffffffd4, 8) , (const, 0x81, 4)
+(stack, 0xffffffffffffffdc, 8) INDIRECT (stack, 0xffffffffffffffdc, 8) , (const, 0x81, 4)
+(stack, 0xffffffffffffffe4, 2) INDIRECT (stack, 0xffffffffffffffe4, 2) , (const, 0x81, 4)
+(stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x81, 4)
+(unique, 0x100000b8, 8) COPY (const, 0x1008c2, 8)
+(stack, 0xffffffffffffffc7, 4) COPY (const, 0x39393939, 4)
+(stack, 0xffffffffffffffcb, 1) COPY (const, 0x0, 1)
+(unique, 0x620, 8) PTRSUB (register, 0x20, 8) , (const, 0xffffffffffffffc7, 8)
+(unique, 0x620, 8) PTRSUB (register, 0x20, 8) , (const, 0xffffffffffffffe6, 8)
+ ---  CALL (ram, 0x1005b0, 8) , (unique, 0x620, 8) , (unique, 0x10000138, 8)
+(register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x90, 4)
+(stack, 0xffffffffffffffc7, 4) INDIRECT (stack, 0xffffffffffffffc7, 4) , (const, 0x90, 4)
+(stack, 0xffffffffffffffcb, 1) INDIRECT (stack, 0xffffffffffffffcb, 1) , (const, 0x90, 4)
+(stack, 0xffffffffffffffcc, 8) INDIRECT (stack, 0xffffffffffffffcc, 8) , (const, 0x90, 4)
+(stack, 0xffffffffffffffd4, 8) INDIRECT (stack, 0xffffffffffffffd4, 8) , (const, 0x90, 4)
+(stack, 0xffffffffffffffdc, 8) INDIRECT (stack, 0xffffffffffffffdc, 8) , (const, 0x90, 4)
+(stack, 0xffffffffffffffe4, 2) INDIRECT (stack, 0xffffffffffffffe4, 2) , (const, 0x90, 4)
+(stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x90, 4)
+(unique, 0x10000138, 8) CAST (unique, 0x620, 8)
+(unique, 0x620, 8) PTRSUB (register, 0x20, 8) , (const, 0xffffffffffffffe6, 8)
+ ---  CALL (ram, 0x1005d0, 8) , (unique, 0x100000c0, 8) , (unique, 0x620, 8)
+(register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x98, 4)
+(stack, 0xffffffffffffffc7, 4) INDIRECT (stack, 0xffffffffffffffc7, 4) , (const, 0x98, 4)
+(stack, 0xffffffffffffffcb, 1) INDIRECT (stack, 0xffffffffffffffcb, 1) , (const, 0x98, 4)
+(stack, 0xffffffffffffffcc, 8) INDIRECT (stack, 0xffffffffffffffcc, 8) , (const, 0x98, 4)
+(stack, 0xffffffffffffffd4, 8) INDIRECT (stack, 0xffffffffffffffd4, 8) , (const, 0x98, 4)
+(stack, 0xffffffffffffffdc, 8) INDIRECT (stack, 0xffffffffffffffdc, 8) , (const, 0x98, 4)
+(stack, 0xffffffffffffffe4, 2) INDIRECT (stack, 0xffffffffffffffe4, 2) , (const, 0x98, 4)
+(stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x98, 4)
+(unique, 0x100000c0, 8) COPY (const, 0x1008cf, 8)
+(register, 0x0, 8) INT_ZEXT (unique, 0x1000009c, 1)
+(register, 0x110, 8) MULTIEQUAL (register, 0x110, 8) , (register, 0x110, 8)
+(unique, 0x1000009c, 1) INT_SLESS (register, 0x38, 4) , (const, 0x2, 4)
+(stack, 0xffffffffffffffc7, 4) MULTIEQUAL (stack, 0xffffffffffffffc7, 4) , (stack, 0xffffffffffffffc7, 4)
+(stack, 0xffffffffffffffcb, 1) MULTIEQUAL (stack, 0xffffffffffffffcb, 1) , (stack, 0xffffffffffffffcb, 1)
+(stack, 0xffffffffffffffcc, 8) MULTIEQUAL (stack, 0xffffffffffffffcc, 8) , (stack, 0xffffffffffffffcc, 8)
+(stack, 0xffffffffffffffd4, 8) MULTIEQUAL (stack, 0xffffffffffffffd4, 8) , (stack, 0xffffffffffffffd4, 8)
+(stack, 0xffffffffffffffdc, 8) MULTIEQUAL (stack, 0xffffffffffffffdc, 8) , (stack, 0xffffffffffffffdc, 8)
+(stack, 0xffffffffffffffe4, 2) MULTIEQUAL (stack, 0xffffffffffffffe4, 2) , (stack, 0xffffffffffffffe4, 2)
+(stack, 0xfffffffffffffff0, 8) MULTIEQUAL (stack, 0xfffffffffffffff0, 8) , (stack, 0xfffffffffffffff0, 8)
+(unique, 0x10000140, 8) INT_ADD (register, 0x110, 8) , (const, 0x28, 8)
+(unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x9e0, 8)
+(register, 0x206, 1) INT_NOTEQUAL (stack, 0xfffffffffffffff0, 8) , (unique, 0x1ff0, 8)
+(unique, 0x9e0, 8) CAST (unique, 0x10000140, 8)
+ ---  CBRANCH (ram, 0x100813, 1) , (register, 0x206, 1)
+ ---  CALL (ram, 0x1005c0, 8)
+ ---  RETURN (const, 0x1, 4)
+(stack, 0xffffffffffffffc7, 4) INDIRECT (stack, 0xffffffffffffffc7, 4) , (const, 0x42, 4)
+(stack, 0xffffffffffffffcb, 1) INDIRECT (stack, 0xffffffffffffffcb, 1) , (const, 0x42, 4)
+(stack, 0xffffffffffffffcc, 8) INDIRECT (stack, 0xffffffffffffffcc, 8) , (const, 0x42, 4)
+(stack, 0xffffffffffffffd4, 8) INDIRECT (stack, 0xffffffffffffffd4, 8) , (const, 0x42, 4)
+(stack, 0xffffffffffffffdc, 8) INDIRECT (stack, 0xffffffffffffffdc, 8) , (const, 0x42, 4)
+(stack, 0xffffffffffffffe4, 2) INDIRECT (stack, 0xffffffffffffffe4, 2) , (const, 0x42, 4)
+(stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x42, 4)
+ ---  RETURN (const, 0x0, 8) , (register, 0x0, 8)
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+
 ### Plotting a Function AST
 Ghidra does not define a default graph provider, so you cannot graph abstract synatax trees out of the box.  Here's a snippet that takes elements from Ghidra's Graph Java snippets and hacks them together to get an SVG version of a function's AST.  This requires you to have `GraphViz` installed with the `dot` binary in your `PATH`, and `networkx` and `pydot` accessible from the Ghidra Jython console.  Basically, I just copy my Python2 site-packages over to my ghidra_scripts directory and everything works.  Keep in mind that if your Python module uses a natively compiled element (like Matplot lib does), you won't be able to use it in Jython. If you know of a way, please let me know.
 
@@ -879,6 +1293,8 @@ Nodes: 47, Edges: 48
 </details>
 
 
+## Working with Graphs
+
 ### Creating a Call Graph
 Ghidra's complex API allows for the creation of various graph structures including directional graphs (digraphs). This example shows how to create a DiGraph of vertices (functions) and edges (calls from/to). 
 
@@ -970,6 +1386,140 @@ DiGraph info:
 </details>
 
 <br>[⬆ Back to top](#table-of-contents)
+
+
+## Miscellaneous
+
+### Program Slices
+Given a specific varnode, Ghidra is able to generate backward and forward program slices. This functionality is contained in the `DecompilerUtils` class as four functions; `getBackwardSlice`, `getForwardSlice`, `getForwardSliceToPCodeOps`, and `getBackwardSliceToPCodeOps`.
+
+You can read more about program slicing online, but the idea is to focus on a specific varnode (say a variable) and slice away anything unrelated to it so you're left with a slice of program related to the element you're interested in. In the Ghidra UI you can right-click a variable and select a program slice option and Ghidra will highlight the slice.  If you right-click and don't see an option, you're not clicking on a compatable varnode / element, try something else.
+
+```python
+from ghidra.util.task import ConsoleTaskMonitor
+from ghidra.app.decompiler import DecompileOptions, DecompInterface
+from ghidra.app.decompiler.component import DecompilerUtils
+
+# == helper functions =============================================================================
+def get_high_function(func):
+    options = DecompileOptions()
+    monitor = ConsoleTaskMonitor()
+    ifc = DecompInterface()
+    ifc.setOptions(options)
+    ifc.openProgram(getCurrentProgram())
+    res = ifc.decompileFunction(func, 60, monitor)
+    high = res.getHighFunction()
+    return high
+
+# == run examples =================================================================================
+func = getGlobalFunctions("main")[0]
+hf = get_high_function(func)
+lsm = hf.getLocalSymbolMap()
+symbols = lsm.getSymbols()
+
+for symbol in symbols:
+    print("\nSymbol name: {}".format(symbol.getName()))
+    hv = symbol.getHighVariable()
+    # Try this snippet with `hv.getInstances()` to enumerate slices for all instances!
+    varnode = hv.getRepresentative()
+    print("Varnode: {}".format(varnode))
+    fs = DecompilerUtils.getForwardSlice(varnode)
+    print("Forward Slice: {}".format(fs))
+    bs = DecompilerUtils.getBackwardSlice(varnode)
+    print("Backward Slice: {}".format(bs))
+    bswo = DecompilerUtils.getBackwardSliceToPCodeOps(varnode)
+    print("Backward Slice w/ PCode Ops: {}".format(bswo))
+    fswo = DecompilerUtils.getForwardSliceToPCodeOps(varnode)
+    print("Forward Slice w/ PCode Ops: {}".format(fswo))
+```
+
+<details>
+<summary>Output examples</summary>
+
+You might think these slices are returning arrays (Python lists) with the name varnodes duplacted over and over - but that's not the case. Each use has a unique ID that ties it to other operations and uses. The printed varnodes may look the same, but these are all unique instances with more data under the hood. Experiment a bit and you'll see what I mean.
+
+```
+Symbol name: local_1c
+Varnode: (stack, 0xffffffffffffffe4, 2)
+Forward Slice: [(stack, 0xffffffffffffffe4, 2), (stack, 0xffffffffffffffe4, 2), (stack, 0xffffffffffffffe4, 2), (stack, 0xffffffffffffffe4, 2)]
+Backward Slice: [(stack, 0xffffffffffffffe4, 2)]
+Backward Slice w/ PCode Ops: []
+Forward Slice w/ PCode Ops: [(stack, 0xffffffffffffffe4, 2) INDIRECT (stack, 0xffffffffffffffe4, 2) , (const, 0x32, 4), (stack, 0xffffffffffffffe4, 2) MULTIEQUAL (stack, 0xffffffffffffffe4, 2) , (stack, 0xffffffffffffffe4, 2), (stack, 0xffffffffffffffe4, 2) INDIRECT (stack, 0xffffffffffffffe4, 2) , (const, 0x42, 4)]
+
+Symbol name: local_24
+Varnode: (stack, 0xffffffffffffffdc, 8)
+Forward Slice: [(stack, 0xffffffffffffffdc, 8), (stack, 0xffffffffffffffdc, 8), (stack, 0xffffffffffffffdc, 8), (stack, 0xffffffffffffffdc, 8)]
+Backward Slice: [(stack, 0xffffffffffffffdc, 8)]
+Backward Slice w/ PCode Ops: []
+Forward Slice w/ PCode Ops: [(stack, 0xffffffffffffffdc, 8) INDIRECT (stack, 0xffffffffffffffdc, 8) , (const, 0x32, 4), (stack, 0xffffffffffffffdc, 8) MULTIEQUAL (stack, 0xffffffffffffffdc, 8) , (stack, 0xffffffffffffffdc, 8), (stack, 0xffffffffffffffdc, 8) INDIRECT (stack, 0xffffffffffffffdc, 8) , (const, 0x42, 4)]
+
+Symbol name: local_35
+Varnode: (stack, 0xffffffffffffffcb, 1)
+Forward Slice: [(stack, 0xffffffffffffffcb, 1), (stack, 0xffffffffffffffcb, 1), (stack, 0xffffffffffffffcb, 1), (stack, 0xffffffffffffffcb, 1)]
+Backward Slice: [(stack, 0xffffffffffffffcb, 1)]
+Backward Slice w/ PCode Ops: []
+Forward Slice w/ PCode Ops: [(stack, 0xffffffffffffffcb, 1) INDIRECT (stack, 0xffffffffffffffcb, 1) , (const, 0x42, 4), (stack, 0xffffffffffffffcb, 1) INDIRECT (stack, 0xffffffffffffffcb, 1) , (const, 0x32, 4), (stack, 0xffffffffffffffcb, 1) MULTIEQUAL (stack, 0xffffffffffffffcb, 1) , (stack, 0xffffffffffffffcb, 1)]
+
+Symbol name: param_1
+Varnode: (register, 0x38, 4)
+Forward Slice: [(register, 0x38, 4), (unique, 0x2250, 1), (register, 0x0, 8), (unique, 0x1000009c, 1)]
+Backward Slice: [(register, 0x38, 4)]
+Backward Slice w/ PCode Ops: []
+Forward Slice w/ PCode Ops: [(unique, 0x2250, 1) INT_SLESS (register, 0x38, 4) , (const, 0x2, 4), (register, 0x0, 8) INT_ZEXT (unique, 0x1000009c, 1), (unique, 0x1000009c, 1) INT_SLESS (register, 0x38, 4) , (const, 0x2, 4),  ---  CBRANCH (ram, 0x100743, 1) , (unique, 0x2250, 1),  ---  RETURN (const, 0x0, 8) , (register, 0x0, 8)]
+
+Symbol name: param_2
+Varnode: (register, 0x30, 8)
+Forward Slice: [(register, 0x30, 8), (unique, 0x1ff0, 8), (unique, 0x1ff0, 8), (unique, 0x10000128, 8), (register, 0x0, 8)]
+Backward Slice: [(register, 0x30, 8)]
+Backward Slice w/ PCode Ops: []
+Forward Slice w/ PCode Ops: [(unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (register, 0x30, 8), (unique, 0x10000128, 8) LOAD (const, 0x1b1, 4) , (register, 0x0, 8),  ---  CALL (ram, 0x1005d0, 8) , (unique, 0x100000a8, 8) , (unique, 0x1ff0, 8), (register, 0x0, 8) PTRADD (register, 0x30, 8) , (const, 0x1, 8) , (const, 0x8, 8), (unique, 0x1ff0, 8) CAST (unique, 0x10000128, 8),  ---  CALL (ram, 0x1005b0, 8) , (unique, 0x10000130, 8) , (unique, 0x1ff0, 8)]
+
+Symbol name: in_FS_OFFSET
+Varnode: (register, 0x110, 8)
+Forward Slice: [(stack, 0xfffffffffffffff0, 8), (stack, 0xfffffffffffffff0, 8), (stack, 0xfffffffffffffff0, 8), (stack, 0xfffffffffffffff0, 8), (stack, 0xfffffffffffffff0, 8), (stack, 0xfffffffffffffff0, 8), (unique, 0x9e0, 8), (stack, 0xfffffffffffffff0, 8), (unique, 0x1ff0, 8), (stack, 0xfffffffffffffff0, 8), (stack, 0xfffffffffffffff0, 8), (register, 0x110, 8), (register, 0x110, 8), (register, 0x206, 1), (register, 0x110, 8), (register, 0x110, 8), (unique, 0x9e0, 8), (register, 0x110, 8), (unique, 0x1ff0, 8), (register, 0x110, 8), (register, 0x110, 8), (register, 0x110, 8), (unique, 0x10000110, 8), (register, 0x110, 8), (unique, 0x10000140, 8)]
+Backward Slice: [(register, 0x110, 8)]
+Backward Slice w/ PCode Ops: []
+Forward Slice w/ PCode Ops: [(unique, 0x10000140, 8) INT_ADD (register, 0x110, 8) , (const, 0x28, 8), (register, 0x206, 1) INT_NOTEQUAL (stack, 0xfffffffffffffff0, 8) , (unique, 0x1ff0, 8), (stack, 0xfffffffffffffff0, 8) INDIRECT (unique, 0x1ff0, 8) , (const, 0x5d, 4), (unique, 0x9e0, 8) CAST (unique, 0x10000110, 8), (unique, 0x9e0, 8) CAST (unique, 0x10000140, 8), (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x9e0, 8), (stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x79, 4), (register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x5d, 4), (stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x65, 4), (stack, 0xfffffffffffffff0, 8) MULTIEQUAL (stack, 0xfffffffffffffff0, 8) , (stack, 0xfffffffffffffff0, 8), (unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x9e0, 8), (register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x79, 4), (stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x81, 4), (register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x90, 4), (stack, 0xfffffffffffffff0, 8) INDIRECT (unique, 0x1ff0, 8) , (const, 0x32, 4), (stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x98, 4),  ---  CBRANCH (ram, 0x100813, 1) , (register, 0x206, 1), (stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x42, 4), (unique, 0x10000110, 8) INT_ADD (register, 0x110, 8) , (const, 0x28, 8), (register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x32, 4), (register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x98, 4), (stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x90, 4), (register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x65, 4), (register, 0x110, 8) MULTIEQUAL (register, 0x110, 8) , (register, 0x110, 8), (register, 0x110, 8) INDIRECT (register, 0x110, 8) , (const, 0x81, 4)]
+
+Symbol name: local_10
+Varnode: (stack, 0xfffffffffffffff0, 8)
+Forward Slice: [(stack, 0xfffffffffffffff0, 8), (stack, 0xfffffffffffffff0, 8), (register, 0x206, 1), (stack, 0xfffffffffffffff0, 8), (stack, 0xfffffffffffffff0, 8), (stack, 0xfffffffffffffff0, 8), (stack, 0xfffffffffffffff0, 8), (stack, 0xfffffffffffffff0, 8), (stack, 0xfffffffffffffff0, 8)]
+Backward Slice: [(stack, 0xfffffffffffffff0, 8), (const, 0x5d, 4), (register, 0x110, 8), (unique, 0x10000110, 8), (unique, 0x9e0, 8), (const, 0x1b1, 4), (const, 0x28, 8), (unique, 0x1ff0, 8)]
+Backward Slice w/ PCode Ops: [(unique, 0x1ff0, 8) LOAD (const, 0x1b1, 4) , (unique, 0x9e0, 8), (unique, 0x10000110, 8) INT_ADD (register, 0x110, 8) , (const, 0x28, 8), (stack, 0xfffffffffffffff0, 8) INDIRECT (unique, 0x1ff0, 8) , (const, 0x5d, 4), (unique, 0x9e0, 8) CAST (unique, 0x10000110, 8)]
+Forward Slice w/ PCode Ops: [(stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x65, 4), (stack, 0xfffffffffffffff0, 8) MULTIEQUAL (stack, 0xfffffffffffffff0, 8) , (stack, 0xfffffffffffffff0, 8), (register, 0x206, 1) INT_NOTEQUAL (stack, 0xfffffffffffffff0, 8) , (unique, 0x1ff0, 8), (stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x42, 4), (stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x81, 4), (stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x90, 4), (stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x98, 4), (stack, 0xfffffffffffffff0, 8) INDIRECT (stack, 0xfffffffffffffff0, 8) , (const, 0x79, 4),  ---  CBRANCH (ram, 0x100813, 1) , (register, 0x206, 1)]
+
+Symbol name: local_1a
+Varnode: (stack, 0xffffffffffffffe6, 10)
+Forward Slice: [(stack, 0xffffffffffffffe6, 10)]
+Backward Slice: [(stack, 0xffffffffffffffe6, 10)]
+Backward Slice w/ PCode Ops: []
+Forward Slice w/ PCode Ops: []
+
+Symbol name: local_34
+Varnode: (stack, 0xffffffffffffffcc, 8)
+Forward Slice: [(stack, 0xffffffffffffffcc, 8), (stack, 0xffffffffffffffcc, 8), (stack, 0xffffffffffffffcc, 8), (stack, 0xffffffffffffffcc, 8)]
+Backward Slice: [(stack, 0xffffffffffffffcc, 8)]
+Backward Slice w/ PCode Ops: []
+Forward Slice w/ PCode Ops: [(stack, 0xffffffffffffffcc, 8) INDIRECT (stack, 0xffffffffffffffcc, 8) , (const, 0x32, 4), (stack, 0xffffffffffffffcc, 8) MULTIEQUAL (stack, 0xffffffffffffffcc, 8) , (stack, 0xffffffffffffffcc, 8), (stack, 0xffffffffffffffcc, 8) INDIRECT (stack, 0xffffffffffffffcc, 8) , (const, 0x42, 4)]
+
+Symbol name: local_2c
+Varnode: (stack, 0xffffffffffffffd4, 8)
+Forward Slice: [(stack, 0xffffffffffffffd4, 8), (stack, 0xffffffffffffffd4, 8), (stack, 0xffffffffffffffd4, 8), (stack, 0xffffffffffffffd4, 8)]
+Backward Slice: [(stack, 0xffffffffffffffd4, 8)]
+Backward Slice w/ PCode Ops: []
+Forward Slice w/ PCode Ops: [(stack, 0xffffffffffffffd4, 8) INDIRECT (stack, 0xffffffffffffffd4, 8) , (const, 0x32, 4), (stack, 0xffffffffffffffd4, 8) MULTIEQUAL (stack, 0xffffffffffffffd4, 8) , (stack, 0xffffffffffffffd4, 8), (stack, 0xffffffffffffffd4, 8) INDIRECT (stack, 0xffffffffffffffd4, 8) , (const, 0x42, 4)]
+
+Symbol name: local_39
+Varnode: (stack, 0xffffffffffffffc7, 4)
+Forward Slice: [(stack, 0xffffffffffffffc7, 4), (stack, 0xffffffffffffffc7, 4), (stack, 0xffffffffffffffc7, 4), (stack, 0xffffffffffffffc7, 4)]
+Backward Slice: [(stack, 0xffffffffffffffc7, 4)]
+Backward Slice w/ PCode Ops: []
+Forward Slice w/ PCode Ops: [(stack, 0xffffffffffffffc7, 4) INDIRECT (stack, 0xffffffffffffffc7, 4) , (const, 0x32, 4), (stack, 0xffffffffffffffc7, 4) MULTIEQUAL (stack, 0xffffffffffffffc7, 4) , (stack, 0xffffffffffffffc7, 4), (stack, 0xffffffffffffffc7, 4) INDIRECT (stack, 0xffffffffffffffc7, 4) , (const, 0x42, 4)]
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
 
 [0]: https://ghidra-sre.org/
 [1]: https://ghidra.re/ghidra_docs/api/ghidra/program/flatapi/FlatProgramAPI.html
