@@ -595,17 +595,17 @@ lsm = high_func.getLocalSymbolMap()
 symbols = lsm.getSymbols()
 
 for i, symbol in enumerate(symbols):
-	print("\nSymbol {}:".format(i+1))
-  print("  name:         {}".format(symbol.name))
-  print("  dataType:     {}".format(symbol.dataType))
-  print("  getPCAddress: 0x{}".format(symbol.getPCAddress()))
-  print("  size:         {}".format(symbol.size))
-  print("  storage:      {}".format(symbol.storage))
-  print("  parameter:    {}".format(symbol.parameter))
-  print("  readOnly:     {}".format(symbol.readOnly))
-  print("  typeLocked:   {}".format(symbol.typeLocked))
-  print("  nameLocked:   {}".format(symbol.nameLocked))
-  print("  slot:         {}".format(symbol.slot))
+    print("\nSymbol {}:".format(i+1))
+    print("  name:         {}".format(symbol.name))
+    print("  dataType:     {}".format(symbol.dataType))
+    print("  getPCAddress: 0x{}".format(symbol.getPCAddress()))
+    print("  size:         {}".format(symbol.size))
+    print("  storage:      {}".format(symbol.storage))
+    print("  parameter:    {}".format(symbol.parameter))
+    print("  readOnly:     {}".format(symbol.readOnly))
+    print("  typeLocked:   {}".format(symbol.typeLocked))
+    print("  nameLocked:   {}".format(symbol.nameLocked))
+    print("  slot:         {}".format(symbol.slot))
 ```
 
 <details>
