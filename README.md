@@ -59,6 +59,7 @@ Feel free to submit pull requests to master on this repo with any modifications 
 <summary>Working with the Decompiler</summary>
 
 * [`Print decompiled code for a specific function`](#print-decompiled-code-for-a-specific-function)
+* [`Getting variable information from the decompiler`](#getting-variable-information-from-the-decompiler)
 
 </details>
 
@@ -551,6 +552,142 @@ undefined8 main(void)
 </details>
 
 <br>[⬆ Back to top](#table-of-contents)
+
+
+### Getting variable information from the decompiler
+Ghidra's decompiler performs a lot of analysis in order to recover variable information.  If you're interested in getting this information you'll need to use the decompiler interface to get a high function and its symbols.  Once you have this data, you can enumerate the symbols and retrieve information about variables in the target function.  Let's take a look at an example decompiled function:
+
+```c++
+undefined8 func(int param_1,int param_2)
+{
+  long in_FS_OFFSET;
+  uint auStack88 [8];
+  undefined4 auStack56 [10];
+  long local_10;
+  
+  local_10 = *(long *)(in_FS_OFFSET + 0x28);
+  auStack56[param_1] = 1;
+  printf("%d\n",(ulong)auStack88[param_2]);
+  if (local_10 != *(long *)(in_FS_OFFSET + 0x28)) {
+    __stack_chk_fail();
+  }
+  return 0;
+}
+```
+
+The decompiled function above shows two stack variables that seem interesting to us; auStack88 and auStack56.  Let's get that information programmatically.
+
+```python
+from ghidra.app.decompiler import DecompileOptions
+from ghidra.app.decompiler import DecompInterface
+from ghidra.util.task import ConsoleTaskMonitor
+
+func_name = "func"
+func = getGlobalFunctions(func_name)[0]
+options = DecompileOptions()
+monitor = ConsoleTaskMonitor()
+ifc = DecompInterface()
+ifc.setOptions(options)
+ifc.openProgram(func.getProgram())
+res = ifc.decompileFunction(func, 60, monitor)
+high_func = res.getHighFunction()
+lsm = high_func.getLocalSymbolMap()
+symbols = lsm.getSymbols()
+
+for i, symbol in enumerate(symbols):
+	print("\nSymbol {}:".format(i+1))
+  print("  name:         {}".format(symbol.name))
+  print("  dataType:     {}".format(symbol.dataType))
+  print("  getPCAddress: 0x{}".format(symbol.getPCAddress()))
+  print("  size:         {}".format(symbol.size))
+  print("  storage:      {}".format(symbol.storage))
+  print("  parameter:    {}".format(symbol.parameter))
+  print("  readOnly:     {}".format(symbol.readOnly))
+  print("  typeLocked:   {}".format(symbol.typeLocked))
+  print("  nameLocked:   {}".format(symbol.nameLocked))
+  print("  slot:         {}".format(symbol.slot))
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+Symbol 1:
+  name:         auStack56
+  dataType:     undefined4[10]
+  getPCAddress: 0xNone
+  size:         40
+  parameter:    0
+  readOnly:     0
+  typeLocked:   0
+  nameLocked:   0
+  slot:         -1
+  storage:      Stack[-0x38]:40
+
+Symbol 2:
+  name:         auStack88
+  dataType:     uint[8]
+  getPCAddress: 0xNone
+  size:         32
+  parameter:    0
+  readOnly:     0
+  typeLocked:   0
+  nameLocked:   0
+  slot:         -1
+  storage:      Stack[-0x58]:32
+
+Symbol 3:
+  name:         in_FS_OFFSET
+  dataType:     long
+  getPCAddress: 0x001006a9
+  size:         8
+  parameter:    0
+  readOnly:     0
+  typeLocked:   0
+  nameLocked:   0
+  slot:         -1
+  storage:      FS_OFFSET:8
+
+Symbol 4:
+  name:         local_10
+  dataType:     long
+  getPCAddress: 0xNone
+  size:         8
+  parameter:    0
+  readOnly:     0
+  typeLocked:   0
+  nameLocked:   0
+  slot:         -1
+  storage:      Stack[-0x10]:8
+
+Symbol 5:
+  name:         param_1
+  dataType:     int
+  getPCAddress: 0x001006a9
+  size:         4
+  parameter:    1
+  readOnly:     0
+  typeLocked:   0
+  nameLocked:   0
+  slot:         0
+  storage:      EDI:4
+
+Symbol 6:
+  name:         param_2
+  dataType:     int
+  getPCAddress: 0x001006a9
+  size:         4
+  parameter:    1
+  readOnly:     0
+  typeLocked:   0
+  nameLocked:   0
+  slot:         1
+  storage:      ESI:4
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
 
 ## Working with Comments
 
