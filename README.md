@@ -37,6 +37,7 @@ Feel free to submit pull requests to master on this repo with any modifications 
 * [`Enumerate all functions printing their name and address`](#enumerate-all-functions-printing-their-name-and-address)
 * [`Get a function name by address`](#get-a-function-name-by-address)
 * [`Get a function address by name`](#get-a-function-address-by-name)
+* [`Get cross references to a function`](#get-cross-references-to-a-function)
 
 </details>
 
@@ -354,6 +355,41 @@ for func in funcs:
 ```
 Found 1 function(s) with the name 'main'
 main is located at 0x00100690
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+### Get cross references to a function
+Ghidra makes it easy to find all cross references to a function using `getReferencesTo`. To use this, you'll just need the function's entry address which can be acquired using the `getEntryPoint` method on a function object.  Let's take a look at an example where we find all cross references to functions named "system".
+
+```python
+fm = currentProgram.getFunctionManager()
+funcs = fm.getFunctions(True)
+for func in funcs:
+  if func.getName() == "system":
+    print("\nFound 'system' @ 0x{}".format(func.getEntryPoint()))
+    entry_point = func.getEntryPoint()
+    references = getReferencesTo(entry_point)
+    for xref in references:
+      print(xref)
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+Found 'system' @ 0x004024a0
+From: 0040bd34 To: 004024a0 Type: UNCONDITIONAL_CALL Op: 0 DEFAULT
+From: 0040a66c To: 004024a0 Type: UNCONDITIONAL_CALL Op: 0 DEFAULT
+From: 00411dd8 To: 004024a0 Type: UNCONDITIONAL_CALL Op: 0 DEFAULT
+From: 004155d8 To: 004024a0 Type: UNCONDITIONAL_CALL Op: 0 DEFAULT
+From: 00415b20 To: 004024a0 Type: UNCONDITIONAL_CALL Op: 0 DEFAULT
+From: 00415d4c To: 004024a0 Type: UNCONDITIONAL_CALL Op: 0 DEFAULT
+
+Found 'system' @ 0x004300fc
+From: 0042f2ec To: 004300fc Type: DATA Op: 0 DEFAULT
+From: 004024a8 To: 004300fc Type: UNCONDITIONAL_CALL Op: 0 ANALYSIS
 ```
 </details>
 
