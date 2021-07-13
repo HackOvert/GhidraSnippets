@@ -30,7 +30,6 @@ Feel free to submit pull requests to master on this repo with any modifications 
 
 </details>
 
-
 <details>
 <summary>Working with Functions</summary>
 
@@ -38,6 +37,14 @@ Feel free to submit pull requests to master on this repo with any modifications 
 * [`Get a function name by address`](#get-a-function-name-by-address)
 * [`Get a function address by name`](#get-a-function-address-by-name)
 * [`Get cross references to a function`](#get-cross-references-to-a-function)
+* [`Analyzing function arguments at cross references`](#analyzing-function-arguments-at-cross-references)
+
+</details>
+
+<details>
+<summary>Working with Basic Blocks</summary>
+
+* [`Print details about basic blocks in a select function`](#print-details-about-basic-blocks-in-a-select-function)
 
 </details>
 
@@ -50,9 +57,10 @@ Feel free to submit pull requests to master on this repo with any modifications 
 </details>
 
 <details>
-<summary>Working with Basic Blocks</summary>
+<summary>Working with Variables</summary>
 
-* [`Print details about basic blocks in a select function`](#print-details-about-basic-blocks-in-a-select-function)
+* [`Get a stack variable from a Varnode or VarnodeAST`](#get-a-stack-variable-from-a-varnode-or-varnodeast)
+* [`Get stack variables from a PcodeOpAST`](#get-a-stack-variable-from-a-pcodeopast)
 
 </details>
 
@@ -395,6 +403,83 @@ From: 004024a8 To: 004300fc Type: UNCONDITIONAL_CALL Op: 0 ANALYSIS
 
 <br>[⬆ Back to top](#table-of-contents)
 
+
+
+# Analyzing function arguments at cross references
+
+
+```python
+from ghidra.app.decompiler import DecompileOptions
+from ghidra.app.decompiler import DecompInterface
+from ghidra.util.task import ConsoleTaskMonitor
+
+TARGET_FUNC = "FUN_62de9540"
+
+# Step 1. Get functions that call the target function ('callers')
+target_addr = 0
+callers = []
+funcs = getGlobalFunctions(TARGET_FUNC)
+for func in funcs:
+    if func.getName() == TARGET_FUNC:
+        print("\nFound {} @ 0x{}".format(TARGET_FUNC, func.getEntryPoint()))
+        target_addr = func.getEntryPoint()
+        references = getReferencesTo(target_addr)
+        for xref in references:
+            call_addr = xref.getFromAddress()
+            caller = getFunctionContaining(call_addr)
+            callers.append(caller)
+        break
+
+# deduplicate callers
+callers = list(set(callers))
+
+# Step 2. Decompile all callers and find PCODE CALL operations leading to `target_add`
+options = DecompileOptions()
+monitor = ConsoleTaskMonitor()
+ifc = DecompInterface()
+ifc.setOptions(options)
+ifc.openProgram(currentProgram)
+
+for caller in callers:
+    res = ifc.decompileFunction(caller, 60, monitor)
+    high_func = res.getHighFunction()
+    lsm = high_func.getLocalSymbolMap()
+    symbols = lsm.getSymbols()
+    if high_func:
+        opiter = high_func.getPcodeOps()
+        while opiter.hasNext():
+            op = opiter.next()
+            mnemonic = str(op.getMnemonic())
+            if mnemonic == "CALL":
+                inputs = op.getInputs()
+                addr = inputs[0].getAddress()
+                args = inputs[1:] # List of VarnodeAST types
+                if addr == target_addr:
+                    print("Call to {} at {} has {} arguments: {}".format(addr, op.getSeqnum().getTarget(), len(args), args))
+                    for arg in args:
+                        # Do stuff with each `arg` here...
+                        # Not sure what to do? Check out this great article by Lars A. Wallenborn for some ideas:
+                        # https://blag.nullteilerfrei.de/2020/02/02/defeating-sodinokibi-revil-string-obfuscation-in-ghidra/
+                        # Specifically, search for the function implementation of "traceVarnodeValue"
+                        pass
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+Found FUN_62de9540 @ 0x62de9540
+Call to 62de9540 at 62dede09 has 0 arguments: array(ghidra.program.model.pcode.Varnode)
+Call to 62de9540 at 62dee3c1 has 0 arguments: array(ghidra.program.model.pcode.Varnode)
+Call to 62de9540 at 62def2b2 has 0 arguments: array(ghidra.program.model.pcode.Varnode)
+Call to 62de9540 at 62dea894 has 3 arguments: array(ghidra.program.model.pcode.Varnode, [(stack, 0x4, 4), (const, 0x0, 4), (const, 0x0, 4)])
+Call to 62de9540 at 62ded7ec has 3 arguments: array(ghidra.program.model.pcode.Varnode, [(stack, 0x8, 4), (unique, 0x10000168, 4), (const, 0x0, 4)])
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+
 ## Working with Instructions
 
 ### Print all instructions in a select function
@@ -488,6 +573,131 @@ for instruction in instructions:
 
 <br>[⬆ Back to top](#table-of-contents)
 
+## Working with Variables
+
+### Get a stack variable from a Varnode or VarnodeAST
+When working with refined PCode you'll almost exclusively be dealing with `VarnodeAST` or `PCodeOpAST` objects. Correlating these objects to stack variables is not something exposed by the Ghidra API (as far as I can tell in v9.2.2). This leads to a complex mess of taking a varnode and comparing it to the decompiler's stack variable symbols for a given function.  It's not intutitive, and quite frankly, it's been the most confusing and complex thing I've done with the Ghidra API to date. 
+
+This function works when you're passing a Varnode/AST of a simple variable, say something like this:
+
+```c
+memset(local_88,0,0x10);
+```
+
+If you want to know what that the first argument (`local_88`) is named "local_88" and get its size, you can use this function.  If that first parameter include nested `PCodeOpAST`s however, say something like `(char *)local_a8`, this function will not work because the variable is "wrapped" inside of a `CAST` operation. In order to work, this needs to be paired with `get_vars_from_varnode` (ctrl-f to find its definition) to unwrap this onion, isolate the variable VarnodeAST, and then pass it here. There's an example of doing that in this document under the heading "Get stack variables from a PcodeOpAST".
+
+```python
+def get_stack_var_from_varnode(func, varnode):
+    if type(varnode) not in [Varnode, VarnodeAST]:
+        raise Exception("Invalid value. Expected `Varnode` or `VarnodeAST`, got {}.".format(type(varnode)))
+    
+    bitness_masks = {
+        '16': 0xffff,
+        '32': 0xffffffff,
+        '64': 0xffffffffffffffff,
+    }
+
+    try:
+      addr_size = currentProgram.getMetadata()['Address Size']
+      bitmask = bitness_masks[addr_size]
+    except KeyError:
+      raise Exception("Unsupported bitness: {}. Add a bit mask for this target.".format(addr_size))
+
+    local_variables = func.getAllVariables()
+    vndef = varnode.getDef()
+    if vndef:
+        vndef_inputs = vndef.getInputs()
+        for defop_input in vndef_inputs:
+            defop_input_offset = defop_input.getAddress().getOffset() & bitmask
+            for lv in local_variables:
+                unsigned_lv_offset = lv.getMinAddress().getUnsignedOffset() & bitmask
+                if unsigned_lv_offset == defop_input_offset:
+                    return lv
+        
+        # If we get here, varnode is likely a "acStack##" variable.
+        hf = get_high_function(func)
+        lsm = hf.getLocalSymbolMap()
+        for vndef_input in vndef_inputs:
+            defop_input_offset = vndef_input.getAddress().getOffset() & bitmask
+            for symbol in lsm.getSymbols():
+                if symbol.isParameter(): 
+                    continue
+                if defop_input_offset == symbol.getStorage().getFirstVarnode().getOffset() & bitmask:
+                    return symbol
+
+    # unable to resolve stack variable for given varnode
+    return None
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+# This output corresponds to this line of code:
+#   memset(local_88,0,0x10);
+# In PCode this line looks like this:
+#   ---  CALL (ram, 0x102370, 8) , (unique, 0x620, 8) , (const, 0x0, 4) , (const, 0x10, 8)
+# The address of `memset` is: (ram, 0x102370, 8)
+# The `local_88` variable is: (unique, 0x620, 8)
+# We'll pass `(unique, 0x620, 8)` to `get_stack_var_from_varnode` to get the following output
+# which will be a list of `ghidra.program.database.function.LocalVariableDB`.
+
+[undefined2 local_88@Stack[-0x88]:2]
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+
+### Get stack variables from a PcodeOpAST
+If you took a look at the code under the section "Get a stack variable from a Varnode or VarnodeAST", you'll probably be asking why that code works for something like: `memset(local_88,0,0x10);` but it fails for `strchr((char *)local_a8,10);`. The reason is that `local_88` is a `VarnodeAST` while `(char *)local_a8` is a `PcodeOpAST`. In other words, the `local_a8` varnode is "wrapped" inside of a `PcodeOpAST` and you can't associate it to any kind of meaningful value without first "unwrapping" it. Of course, a wrapped `VarnodeAST` could be wrapped in numerous `CAST` operations and `INT_ADD` operations, etc.  So how do we handle this? Recursion. * shudder *. 
+
+Fair warning, recursion is my computer science nemisis. If you look at this code and think "this is odd" - you're probably right!
+
+That being said, let's slap something like `(char *)local_a8` into this function and see if we can get the associated variable name(s) out of it. It's perfectly fine to pass a `PcodeOpAST` with multiple variables (e.g. `(long)iVar2 + local_a0`) into this function. It will just return a list of all variables contained in that `VarnodeAST`.
+
+```python
+def get_vars_from_varnode(func, node, variables=None):
+    if type(node) not in [PcodeOpAST, VarnodeAST]:
+        raise Exception("Invalid value passed. Got {}.".format(type(node)))
+
+    # create `variables` list on first call. Do not make `variables` default to [].
+    if variables == None:
+        variables = []
+
+    # We must use `getDef()` on VarnodeASTs
+    if type(node) == VarnodeAST:
+        # For `get_stack_var_from_varnode` see:
+        # https://github.com/HackOvert/GhidraSnippets 
+        # Ctrl-F for "get_stack_var_from_varnode"
+        var = get_stack_var_from_varnode(func, node)
+        if var and type(var) != HighSymbol:
+            variables.append(var.getName())
+        node = node.getDef()
+        if node:
+            variables = get_vars_from_varnode(func, node, variables)
+
+    # We must call `getInputs()` on PcodeOpASTs
+    elif type(node) == PcodeOpAST:
+        nodes = list(node.getInputs())
+        for node in nodes:
+            if type(node.getHigh()) == HighLocal:
+                variables.append(node.getHigh().getName())
+            else:
+                variables = get_vars_from_varnode(func, node, variables)
+
+    return variables
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+Python output goes here...
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
 
 ## Working with Basic Blocks
 Basic Blocks are collections of continuous non-branching instructions within Functions. They are joined by conditional and non-conditional branches, revealing valuable information about a program and function's code flow. This section deals with examples working with Basic Block models.
