@@ -406,7 +406,7 @@ From: 004024a8 To: 004300fc Type: UNCONDITIONAL_CALL Op: 0 ANALYSIS
 
 
 # Analyzing function arguments at cross references
-
+In this snippet we locate cross references to a target function (`TARGET_FUNC`) and show how we can analyze the arguments passed to each call. This can be helpful in analyzing malware, or potentially vulnerable functions.  For malware analysis, this may help "decrypt" strings, or in vulnerability research this may help locate functions that may be vulnerable if called with an incorrect value.  The specific analysis performed on the arguments of a called target function are up to you. This snippet will allow you to add your own analysis as you see fit.
 
 ```python
 from ghidra.app.decompiler import DecompileOptions
