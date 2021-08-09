@@ -38,6 +38,7 @@ Feel free to submit pull requests to master on this repo with any modifications 
 * [`Get a function address by name`](#get-a-function-address-by-name)
 * [`Get cross references to a function`](#get-cross-references-to-a-function)
 * [`Analyzing function arguments at cross references`](#analyzing-function-arguments-at-cross-references)
+* [`Rename functions based on strings`](#rename-functions-based-on-strings)
 
 </details>
 
@@ -404,8 +405,7 @@ From: 004024a8 To: 004300fc Type: UNCONDITIONAL_CALL Op: 0 ANALYSIS
 <br>[⬆ Back to top](#table-of-contents)
 
 
-
-# Analyzing function arguments at cross references
+### Analyzing function arguments at cross references
 In this snippet we locate cross references to a target function (`TARGET_FUNC`) and show how we can analyze the arguments passed to each call. This can be helpful in analyzing malware, or potentially vulnerable functions.  For malware analysis, this may help "decrypt" strings, or in vulnerability research this may help locate functions that may be vulnerable if called with an incorrect value.  The specific analysis performed on the arguments of a called target function are up to you. This snippet will allow you to add your own analysis as you see fit.
 
 ```python
@@ -478,6 +478,116 @@ Call to 62de9540 at 62ded7ec has 3 arguments: array(ghidra.program.model.pcode.V
 </details>
 
 <br>[⬆ Back to top](#table-of-contents)
+
+
+
+### Rename functions based on strings
+In some cases strings will either hint at or give the name of a function when symbols aren't available.  In these cases, we can rename functions based on these strings to help perform reverse engineering.  This becomes a daunting task when there are hundreds or thousands of these cases, making the process of copy, rename, paste, a soul crushing task.  The power of tools like Ghidra is that you can script this.  Take for example this decompiled function found in a binary:
+
+```
+undefined4 FUN_00056b58(void)
+{
+	undefined4 in_r3;
+
+	register_function(1, "core_Init_Database", FUN_00058294);
+	register_function(1, "core_Clear_Database", FUN_00058374);
+	register_function(1, "core_Auth_Database", FUN_00058584);
+	register_function(1, "core_Add_User_Database", FUN_00058650);
+	
+	// ... hundreds more in this function and in others ...
+	
+	return in_r3;
+}
+```
+
+In this function, we have calls to a `register_function` which correlates an event string with a handler function.  We want to rename these functions so that `FUN_00058294` becomes `core_Init_Database` and so on.  Below is code that performs this task for every `register_function` in the target binary.
+
+```python
+from ghidra.app.decompiler import DecompileOptions
+from ghidra.app.decompiler import DecompInterface
+from ghidta.util.task import ConsoleTaskMonitor
+
+def getString(addr):
+	mem = currentProgram.getMemory()
+	core_name_str = ""
+	while True:
+		byte = mem.getByte(addr.add(len(core_name_str)))
+		if byte == 0:
+			return core_name_str
+		core_name_str += chr(byte)
+
+# Get decompiler interface
+options = DecompileOptions()
+monitor = ConsoleTaskMonitor()
+ifc = DecompInterface()
+ifc.setOptions(options)
+ifc.openProgram(currentProgram)
+
+# Get reference to `register_function`
+fm = currentProgram.getFunctionManager()
+funcs = fm.getFunctions(True)
+register_function = None
+for func in funcs:
+	if func.getName() == "register_function":
+		register_function = func
+		break
+
+# Get xrefs to "register_function"
+entry_point = register_function.getEntryPoint()
+xrefs = getReferencesTo(entry_point)
+callers = []
+for xref in xrefs:
+	from_addr = xref.getFromAddress()
+	caller = fm.getFunctionContaining(from_addr)
+	if caller not in callers:
+		callers.append(caller)
+
+# Process callers (functions calling `register_function`)
+for caller in callers:
+	if not caller:
+		continue
+	res ifc.decompileFunction(caller, 60, monitor)
+	hf = res.getHighFunction()
+	opiter = hf.getPcodeOps()
+	while opiter.hasNext():
+		op = opiter.next()
+		mnemonic = op.getMnemonic()
+		if mnemonic == "CALL":
+			call_target = op.getInput(0)
+			if call_target.getAddress == entry_point:
+				core_name = op.getInput(2)
+				core_func = op.getInput(3)
+				core_name_def = core_name.getDef()
+				core_name_addr = toAddr(core_name_def.getInput(0).getOffset())
+				core_string = getString(core_name_addr)
+				core_func_addr = toAddr(core_function.getDef().getInput(1).getOffset())
+				core_func_obj = fm.getFunctionAt(core_func_addr)
+				core_func_obj.setName(core_string, ghidra.program.model.symbol.SourceType.DEFAULT)
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+undefined4 FUN_00056b58(void)
+{
+	undefined4 in_r3;
+
+	register_function(1, "core_Init_Database", core_Init_Database);
+	register_function(1, "core_Clear_Database", core_Clear_Database);
+	register_function(1, "core_Auth_Database", core_Auth_Database);
+	register_function(1, "core_Add_User_Database", core_Add_User_Database);
+	
+	// ... hundreds more in this function and in others ...
+	
+	return in_r3;
+}
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+
 
 
 ## Working with Instructions
