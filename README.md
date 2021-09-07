@@ -77,6 +77,8 @@ Feel free to submit pull requests to master on this repo with any modifications 
 <summary>Working with Comments</summary>
 
 * [`Get all Automatic comments for a function`](#get-all-automatic-comments-for-a-function)
+* [`Get specific comment types for all functions`](#get-specific-comment-types-for-all-functions)
+
 
 </details>
 
@@ -1076,6 +1078,51 @@ for codeUnit in codeUnits:
 array(java.lang.String, [u'undefined register_tm_clones()'])
 undefined register_tm_clones()
 ... snip ...
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+
+### Get specific comment types for all functions
+
+Ghidra supports 5 unique comment types users can add to their projects. This snippet shows you show to print all comments by type. This snippet is a slightly modified version of what user `u/securisec` posted in the Ghidra subreddit, `r/ghidra`. Thanks!
+
+```python
+fm = currentProgram.getFunctionManager()
+listing = currentProgram.getListing()
+funcs = fm.getFunctions(True) # True means iterate forward
+
+comment_types = { 
+    0: 'EOL', 
+    1: 'PRE', 
+    2: 'POST',
+    3: 'PLATE',
+    4: 'REPEATABLE',
+}
+
+for func in funcs: 
+    addrSet = func.getBody()
+    codeUnits = listing.getCodeUnits(addrSet, True)
+    for codeUnit in codeUnits:
+        for i, comment_type in comment_types.items():
+            comment = codeUnit.getComment(i)
+            if comment is not None:
+                comment = comment.decode("utf-8")
+                print("[{} : {}] {}: {}".format(func.name, codeUnit.address, comment_type, comment))
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+[TclCompileSwitchCmd : 00058f3c] EOL: EOL COMMENT 000
+[TclCompileSwitchCmd : 00058f3c] PRE: PRE-COMMENT 111
+[TclCompileSwitchCmd : 00058f3c] POST: POST COMMENT 222
+[TclCompileSwitchCmd : 00058f3c] PLATE: PLATE COMMENT 333
+[TclCompileSwitchCmd : 00058f3c] REPEATABLE: REPEATABLE COMMENT 444
+[getpagesize : 00110000] EOL: Grocery list: milk, cookies, santa trap
+[getpagesize : 00110000] PRE: getpagesize@@GLIBC_2.0
 ```
 </details>
 
