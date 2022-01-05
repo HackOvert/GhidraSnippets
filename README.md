@@ -54,6 +54,7 @@ Feel free to submit pull requests to master on this repo with any modifications 
 
 * [`Print all instructions in a select function`](#print-all-instructions-in-a-select-function)
 * [`Find all calls and jumps to a register`](#find-all-calls-and-jumps-to-a-register)
+* [`Count all mnemonics in a binary`](#count-all-mnemonics-in-a-binary)
 
 </details>
 
@@ -680,6 +681,54 @@ for instruction in instructions:
 0x00100544 : JMP RAX
 0x00100595 : JMP RDX
 0x00100771 : CALL R15
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+
+### Count all mnemonics in a binary
+While recently preparing to teach some introductary x86, I wanted to know the most used mnemonics appearing in a given application to make sure I covered them. This is insanely easy to do in Binary Ninja, but a bit more involved in Ghidra. Essentially, we track mnemonics in a dictionary and increment the count as we process all instructions in a binary.  
+
+This requires getting a `InstructionDB` and using the `getMnemonicString` method to determine the mnemonic of the native assembly instruction. At the end of this snippet, we copy/pasta code from StackOverflow to sort our collected data without really thinking about how it works and we call it a day. All joking aside, this is a pretty neat way to prioritize which instructions you should focus on learning if you're learning a new architecture and don't know where to begin.
+
+```python
+instructions = {}
+af = currentProgram.getAddressFactory()
+
+func = getFirstFunction()
+addr = af.getAddress(str(func.getEntryPoint()))
+ins = getInstructionAt(addr)
+
+while ins is not None:
+    mnemonic = ins.getMnemonicString()
+    if mnemonic in instructions:
+        instructions[mnemonic] += 1
+    else:
+        instructions[mnemonic] = 1
+    ins = ins.getNext()
+
+ins_sorted = [ (i,mnem) for mnem,i in instructions.iteritems() ]
+ins_sorted.sort(reverse=True)
+for i,mnem in ins_sorted:
+    print("{}: {}".format(i, mnem))
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+178636: MOV
+43836: CALL
+35709: LEA
+25479: CMP
+19316: ADD
+18943: JZ
+15751: SUB
+14636: TEST
+14236: POP
+13384: PUSH
+...snip...
 ```
 </details>
 
