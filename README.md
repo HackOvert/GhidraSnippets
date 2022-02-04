@@ -508,7 +508,7 @@ In this function, we have calls to a `register_function` which correlates an eve
 ```python
 from ghidra.app.decompiler import DecompileOptions
 from ghidra.app.decompiler import DecompInterface
-from ghidta.util.task import ConsoleTaskMonitor
+from ghidra.util.task import ConsoleTaskMonitor
 
 def getString(addr):
 	mem = currentProgram.getMemory()
