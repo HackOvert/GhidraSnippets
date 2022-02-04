@@ -549,7 +549,7 @@ for xref in xrefs:
 for caller in callers:
 	if not caller:
 		continue
-	res ifc.decompileFunction(caller, 60, monitor)
+	res = ifc.decompileFunction(caller, 60, monitor)
 	hf = res.getHighFunction()
 	opiter = hf.getPcodeOps()
 	while opiter.hasNext():
@@ -2119,4 +2119,3 @@ Forward Slice w/ PCode Ops: [(stack, 0xffffffffffffffc7, 4) INDIRECT (stack, 0xf
 [4]: https://ghidra.re/ghidra_docs/api/ghidra/base/project/GhidraProject.html
 [5]: https://ghidra.re/ghidra_docs/api/ghidra/program/model/listing/Program.html
 [6]: https://ghidra.re/ghidra_docs/api/ghidra/program/database/ProgramDB.html
-
