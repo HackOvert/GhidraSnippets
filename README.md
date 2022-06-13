@@ -37,7 +37,8 @@ Feel free to submit pull requests to master on this repo with any modifications 
 * [`Get a function name by address`](#get-a-function-name-by-address)
 * [`Get a function address by name`](#get-a-function-address-by-name)
 * [`Get cross references to a function`](#get-cross-references-to-a-function)
-* [`Analyzing function arguments at cross references`](#analyzing-function-arguments-at-cross-references)
+* [`Analyzing function call arguments`](#analyzing-function-call-arguments)
+* [`Analyzing function call arguments at cross references`](#analyzing-function-call-arguments-at-cross-references)
 * [`Rename functions based on strings`](#rename-functions-based-on-strings)
 
 </details>
@@ -408,7 +409,44 @@ From: 004024a8 To: 004300fc Type: UNCONDITIONAL_CALL Op: 0 ANALYSIS
 <br>[⬆ Back to top](#table-of-contents)
 
 
-### Analyzing function arguments at cross references
+### Analyzing function call arguments
+This snippet uses a `TARGET_ADDR` which should be the address of a call to return the call arguments at that address. Thanks to [gipi](https://github.com/gipi) for [suggesting](https://github.com/HackOvert/GhidraSnippets/issues/4) this much cleaner way to obtain function call arguments than previously listed!
+
+```python
+from ghidra.app.decompiler import DecompileOptions
+from ghidra.app.decompiler import DecompInterface
+from ghidra.util.task import ConsoleTaskMonitor
+
+# # Disassembly shows: 00434f6c    CALL    FUN_00433ff0
+# # Decompiler shows:  uVar1 = FUN_00433ff0(param_1,param_2,param_3);
+TARGET_ADDR = toAddr(0x00434f6c)
+
+options = DecompileOptions()
+monitor = ConsoleTaskMonitor()
+ifc = DecompInterface()
+ifc.setOptions(options)
+ifc.openProgram(currentProgram)
+
+func = getFunctionContaining(TARGET_ADDR)
+res = ifc.decompileFunction(func, 60, monitor)
+high_func = res.getHighFunction()
+pcodeops = high_func.getPcodeOps(TARGET_ADDR)
+op = pcodeops.next()
+print(op.getInputs())
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+array(ghidra.program.model.pcode.Varnode, [(ram, 0x433ff0, 8), (stack, 0x4, 4), (stack, 0x8, 4), (stack, 0xc, 4)])
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+
+### Analyzing function call arguments at cross references
 In this snippet we locate cross references to a target function (`TARGET_FUNC`) and show how we can analyze the arguments passed to each call. This can be helpful in analyzing malware, or potentially vulnerable functions.  For malware analysis, this may help "decrypt" strings, or in vulnerability research this may help locate functions that may be vulnerable if called with an incorrect value.  The specific analysis performed on the arguments of a called target function are up to you. This snippet will allow you to add your own analysis as you see fit.
 
 ```python
