@@ -595,7 +595,7 @@ for caller in callers:
 		mnemonic = op.getMnemonic()
 		if mnemonic == "CALL":
 			call_target = op.getInput(0)
-			if call_target.getAddress == entry_point:
+			if call_target.getAddress() == entry_point:
 				core_name = op.getInput(2)
 				core_func = op.getInput(3)
 				core_name_def = core_name.getDef()
