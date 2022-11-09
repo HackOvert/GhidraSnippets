@@ -15,12 +15,22 @@ Feel free to submit pull requests to master on this repo with any modifications 
 # Table of Contents
 
 <details>
+<summary>Working with the Flat APIs</summary>
+
+* [`Using the FlatProgramAPI`](#using-the-flatprogramapi)
+* [`Using the FlatDecompilerAPI`](#using-the-flatdecompilerapi)
+* [`Using the FlatDebuggerAPI`](#using-the-flatdebuggerapi)
+
+</details>
+
+<details>
 <summary>Working with Projects</summary>
 
 * [`Get the name and location on disk of the current project`](#get-the-name-and-location-on-disk-of-the-current-project)
 * [`List all programs in the current project`](#list-all-programs-in-the-current-project)
 
 </details>
+
 
 <details>
 <summary>Working with Programs</summary>
@@ -108,6 +118,149 @@ Feel free to submit pull requests to master on this repo with any modifications 
 
 </details>
 
+## Working with the Flat APIs
+As stated in the introduction, the simplest method of using Ghidra's API is via the Flat APIs. As of Ghidra 10.2 this includes FlatProgramAPI, FlatDecompilerAPI, and the most recent FlatDebuggerAPI. The Flat APIs are designed to offer a stable API interface to some of Ghidra's high level functionality. The simplicity and convenience offered by the Flat APIs can be quickly eclipsed by their limited functionality. However, if what you need to do is offered via the Flat APIs, it's highly recommended you use them.
+
+### Using the FlatProgramAPI
+The `FlatProgramAPI` is a simple interface to Ghidra's program related functionality. This includes functions, data, instructions, etc.
+
+```python
+from ghidra.program.flatapi import FlatProgramAPI
+
+state = getState()
+program = state.getCurrentProgram()
+fpapi = FlatProgramAPI(program)
+
+for x in dir(fpapi): print(x)
+print(fpapi.currentProgram)
+print(fpapi.firstFunction)
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+MAX_REFERENCES_TO
+__class__
+<...snip...>
+addressFactory
+analyze
+analyzeAll
+<...snip...>
+currentProgram
+disassemble
+<...snip...>
+findStrings
+firstData
+firstFunction
+firstInstruction
+getAddressFactory
+getBookmarks
+<...snip...>
+bug - .ProgramDB
+_init
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+### Using the FlatDecompilerAPI
+The `FlatDecompilerAPI` is a simple interface to Ghidra's decompiler and requires an instance of the `FlatProgramAPI` for initialization in order to do anything useful. In other words, we need a target program to use the decompiler.
+
+```python
+from ghidra.app.decompiler.flatapi import FlatDecompilerAPI
+from ghidra.program.flatapi import FlatProgramAPI
+
+fpapi = FlatProgramAPI(getState().getCurrentProgram())
+fdapi = FlatDecompilerAPI(fpapi)
+
+for x in dir(fdapi): print(x)
+
+main_decomp = fdapi.decompile(fpapi.getFunction('main'))
+print(main_decomp)
+
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+<...snip...>
+decompile
+decompiler
+dispose
+equals
+getClass
+getDecompiler
+hashCode
+initialize
+notify
+notifyAll
+toString
+wait
+
+int main(void)
+
+{
+  int retVal;
+  long in_FS_OFFSET;
+  int choice;
+  char *local_38 [5];
+  long stackCookie;
+  
+  stackCookie = *(long *)(in_FS_OFFSET + 0x28);
+  choice = 0;
+  local_38[0] = "My secret";
+  local_38[1] = "Red";
+  local_38[2] = "Green";
+  local_38[3] = "Blue";
+  printf("Choice: ");
+  __isoc99_fscanf(stdin,"%d",&choice);
+  if ((choice == 0) || (3 < choice)) {
+    printf("Invalid choice: %d!\n",(ulong)(uint)choice);
+    retVal = -1;
+  }
+  else {
+    printf("data[%d]: %s\n",(ulong)(uint)choice,local_38[(int)(char)choice]);
+    retVal = 0;
+  }
+  if (stackCookie != *(long *)(in_FS_OFFSET + 0x28)) {
+                    /* WARNING: Subroutine does not return */
+    __stack_chk_fail();
+  }
+  return retVal;
+}
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
+
+### Using the FlatDebuggerAPI
+The `FlatDebuggerAPI` is a simple interface to Ghidra's debugger and trace functionality. This is a new feature as of Ghidra 10.2 and yet to be documented in the Ghidra 10.2 API docs. For some extra context about this API, see [DemoDebuggerScript.java](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_10.2_build/Ghidra/Debug/Debugger/ghidra_scripts/DemoDebuggerScript.java). As I learn more about this API I'll update this section.
+
+```python
+from ghidra.debug.flatapi import FlatDebuggerAPI
+
+fdapi = FlatDebuggerAPI
+
+for x in dir(fdapi): print(x)
+```
+
+<details>
+<summary>Output example</summary>
+
+```
+<...snip...>
+kill
+launch
+launchOffers
+<...snip...>
+writeMemory
+writeRegister
+```
+</details>
+
+<br>[⬆ Back to top](#table-of-contents)
 
 ## Working with Projects
 A Ghidra *Project* (class [GhidraProject][4]) contains a logical set of program binaries related to a reverse engineering effort. Projects can be shared (collaborative) or non-shared (private). The snippets in this section deal with bulk import and analysis, locating project files on disk, and more.
@@ -766,7 +919,7 @@ for i,mnem in ins_sorted:
 14636: TEST
 14236: POP
 13384: PUSH
-...snip...
+<...snip...>
 ```
 </details>
 
