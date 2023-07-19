@@ -754,7 +754,7 @@ for caller in callers:
 				core_name_def = core_name.getDef()
 				core_name_addr = toAddr(core_name_def.getInput(0).getOffset())
 				core_string = getString(core_name_addr)
-				core_func_addr = toAddr(core_function.getDef().getInput(1).getOffset())
+				core_func_addr = toAddr(core_func.getDef().getInput(1).getOffset())
 				core_func_obj = fm.getFunctionAt(core_func_addr)
 				core_func_obj.setName(core_string, ghidra.program.model.symbol.SourceType.DEFAULT)
 ```
