@@ -2078,94 +2078,77 @@ Nodes: 47, Edges: 48
 ## Working with Graphs
 
 ### Creating a Call Graph
-Ghidra's complex API allows for the creation of various graph structures including directional graphs (digraphs). This example shows how to create a DiGraph of vertices (functions) and edges (calls from/to). 
+Ghidra's complex API allows for the creation of various graph structures including Attributed graphs. This example shows how to create a Graph of vertices (functions) and edges (calls from/to). 
 
-Note that adding a vertex or an edge between two vertex entries does not reuse or override them! This is because, while many nodes share the same name, they contain unique hash codes (keys). If you were looking to trim this graph to include only unqiue nodes, you would need to consider both the name of the symbol and its address to account for overridden functions. 
-
-In its current form, this DiGraph is unlikely to be of any use to you. But the building blocks of creating interesting control flow graphs (CFG), program dependence graphs (PDG), data dependency graphs (DDG), and other graphs are all here.
+The graph will be show in a seperated window.
 
 ```python
-from ghidra.util.graph import DirectedGraph
-from ghidra.util.graph import Edge
-from ghidra.util.graph import Vertex
+from ghidra.service.graph import *
+from ghidra.app.services import GraphDisplayBroker
+from ghidra.app.decompiler import DecompInterface
+from ghidra.framework.plugintool import PluginTool
+from ghidra.program.model.address import Address
+from ghidra.program.model.pcode import PcodeOp
 
-def getAddress(offset):
-    return currentProgram.getAddressFactory().getDefaultAddressSpace().getAddress(offset)
-
-digraph = DirectedGraph()
+decomplib = DecompInterface()
+decomplib.openProgram(currentProgram)
+graph_type = EmptyGraphType()
+graph = AttributedGraph("Test", graph_type)
 listing = currentProgram.getListing()
 fm = currentProgram.getFunctionManager()
+MAX_NODE = 50  # the ghidra graph service will unstable if too many nodes
 
-funcs = fm.getFunctions(True) # True mean iterate forward
-for func in funcs: 
-	# Add function vertices
-	print("Function: {} @ 0x{}".format(func.getName(), func.getEntryPoint())) # FunctionDB
-	digraph.add(Vertex(func))
-	
-	# Add edges for static calls
-	entryPoint = func.getEntryPoint()
-	instructions = listing.getInstructions(entryPoint, True)
-	for instruction in instructions:
-		addr = instruction.getAddress()
-		oper = instruction.getMnemonicString()
-		if oper == "CALL":
-			print("    0x{} : {}".format(addr, instruction))
-			flows = instruction.getFlows()
-			if len(flows) == 1:
-				target_addr = "0x{}".format(flows[0])
-				digraph.add(Edge(Vertex(func), Vertex(fm.getFunctionAt(getAddress(target_addr)))))
+def dec_high_func(addr):
+    timeout = 60
+    if not isinstance(addr, Address):
+        addr = toAddr(addr)
+    func = getFunctionContaining(addr)
+    dres = decomplib.decompileFunction(func, timeout, getMonitor())
+    hfunc = dres.getHighFunction()
+    return hfunc
 
-print("DiGraph info:")
-edges = digraph.edgeIterator()
-while edges.hasNext():
-	edge = edges.next()
-	from_vertex = edge.from()
-	to_vertex = edge.to()
-	print("  Edge from {} to {}".format(from_vertex, to_vertex))
 
-vertices = digraph.vertexIterator()
-while vertices.hasNext():
-	vertex = vertices.next()
-	print("  Vertex: {} (key: {})".format(vertex, vertex.key()))
-    # some extra stuff you might want to see
-	#print("    type(vertex):      {}".format(type(vertex)))
-	#print("    vertex.hashCode(): {}".format(vertex.hashCode()))
-	#print("    vertex.referent(): {}".format(vertex.referent()))
-	#print("    type(referent):    {}".format(type(vertex.referent())))
+funcs = fm.getFunctions(True)  # True mean iterate forward
+func_ver = {}  # function to vertex
+has_edge = {}  # vertex and edges related
+
+for func in funcs:
+    ver_ = graph.addVertex(func.getName(), func.getName())
+    func_ver[func] = ver_
+    has_edge[func] = 0
+
+funcs = fm.getFunctions(True)
+
+for func in funcs:
+    # Add edges for static calls
+    entryPoint = func.getEntryPoint()
+    hfunc = dec_high_func(entryPoint)
+    for pcode_ in hfunc.getPcodeOps():
+        if pcode_.getOpcode() == PcodeOp.CALL:
+            target_addr = pcode_.getInput(0).getOffset()
+            to_func = fm.getFunctionAt(toAddr(target_addr))
+            graph.addEdge(func_ver[func], func_ver[to_func])
+            has_edge[func] += 1
+            has_edge[to_func] += 1
+
+# sort the function by edge numbers
+sorted_tuples = sorted(has_edge.items(), key=lambda x: x[1], reverse=True)
+func_num = 0
+for func_ in has_edge:
+    # the ghidra graph service can not handle node more than 500
+    if has_edge[func_] == 0:
+        graph.removeVertex(func_ver[func_])
+    elif func_num > MAX_NODE:
+        graph.removeVertex(func_ver[func_])
+    else:
+        func_num += 1
+
+
+tool = getState().getTool()
+service = tool.getService(GraphDisplayBroker)
+display = service.getDefaultGraphDisplay(False, monitor)
+display.setGraph(graph, "Test", False, monitor)
 ```
-
-<details>
-<summary>Output example</summary>
-
-```
-Function: main @ 0x0010064a
-    0x00100691 : CALL 0x00100520
-    0x001006cc : CALL 0x001004f0
-    0x001006e9 : CALL qword ptr [R12 + RBX*0x8]
-<...snip...>
-
-DiGraph info:
-  Edge from _init to __gmon_start__
-  Edge from _init to __libc_start_main
-  Edge from _init to __cxa_finalize
-  Edge from _init to deregister_tm_clones
-  Edge from _init to printf
-  Edge from _init to _init
-  Edge from printf to __libc_start_main
-  Edge from printf to __cxa_finalize
-  <...snip...>
-  Vertex: _init (key: 3690)
-  Vertex: main (key: 3803)
-  Vertex: main (key: 3804)
-  Vertex: printf (key: 3805)
-  Vertex: main (key: 3807)
-  Vertex: _init (key: 3808)
-  Vertex: __libc_csu_init (key: 3810)
-  Vertex: _init (key: 3812)
-  Vertex: __libc_csu_fini (key: 3814)
-  <...snip...>
-```
-</details>
 
 <br>[⬆ Back to top](#table-of-contents)
 
